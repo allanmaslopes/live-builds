@@ -1,0 +1,727 @@
+{
+  "_fixture_note": "Fixture sintético baseado no formato público da Live Client Data API; será substituído por snapshots reais na Task 7. Não representa uma partida capturada. Variante Arena também sintética: oito jogadores em quatro subtimes, sem position.",
+  "activePlayer": {
+    "abilities": {
+      "Q": {
+        "abilityLevel": 4,
+        "displayName": "Fixture Q",
+        "id": "ThreshQ",
+        "rawDescription": "GeneratedTip_Spell_ThreshQ_Description",
+        "rawDisplayName": "GeneratedTip_Spell_ThreshQ_DisplayName"
+      },
+      "W": {
+        "abilityLevel": 3,
+        "displayName": "Fixture W",
+        "id": "ThreshW",
+        "rawDescription": "GeneratedTip_Spell_ThreshW_Description",
+        "rawDisplayName": "GeneratedTip_Spell_ThreshW_DisplayName"
+      },
+      "E": {
+        "abilityLevel": 3,
+        "displayName": "Fixture E",
+        "id": "ThreshE",
+        "rawDescription": "GeneratedTip_Spell_ThreshE_Description",
+        "rawDisplayName": "GeneratedTip_Spell_ThreshE_DisplayName"
+      },
+      "R": {
+        "abilityLevel": 2,
+        "displayName": "Fixture R",
+        "id": "ThreshR",
+        "rawDescription": "GeneratedTip_Spell_ThreshR_Description",
+        "rawDisplayName": "GeneratedTip_Spell_ThreshR_DisplayName"
+      }
+    },
+    "championStats": {
+      "abilityHaste": 0,
+      "abilityPower": 0,
+      "armor": 45,
+      "attackDamage": 65,
+      "attackRange": 450,
+      "attackSpeed": 0.7,
+      "bonusArmorPenetrationPercent": 0,
+      "bonusMagicPenetrationPercent": 0,
+      "critChance": 0,
+      "critDamage": 1.75,
+      "currentHealth": 700,
+      "healShieldPower": 0,
+      "healthRegenRate": 5,
+      "lifeSteal": 0,
+      "magicLethality": 0,
+      "magicPenetrationFlat": 0,
+      "magicPenetrationPercent": 0,
+      "magicResist": 35,
+      "maxHealth": 900,
+      "moveSpeed": 335,
+      "omnivamp": 0,
+      "physicalLethality": 0,
+      "physicalVamp": 0,
+      "resourceMax": 500,
+      "resourceRegenRate": 6,
+      "resourceType": "MANA",
+      "resourceValue": 300,
+      "spellVamp": 0,
+      "tenacity": 0
+    },
+    "currentGold": 1800,
+    "fullRunes": {
+      "generalRunes": [],
+      "keystone": {
+        "id": 8439
+      },
+      "primaryRuneTree": {
+        "id": 8400
+      },
+      "secondaryRuneTree": {
+        "id": 8300
+      },
+      "statRunes": []
+    },
+    "level": 12,
+    "riotId": "FixturePlayer#BR1",
+    "riotIdGameName": "FixturePlayer",
+    "riotIdTagLine": "BR1",
+    "summonerName": "FixturePlayer"
+  },
+  "allPlayers": [
+    {
+      "championName": "Thresh",
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Fixture item 3850",
+          "itemID": 3850,
+          "price": 0,
+          "rawDescription": "game_item_description_3850",
+          "rawDisplayName": "game_item_displayname_3850",
+          "slot": 0
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Fixture item 1001",
+          "itemID": 1001,
+          "price": 0,
+          "rawDescription": "game_item_description_1001",
+          "rawDisplayName": "game_item_displayname_1001",
+          "slot": 1
+        }
+      ],
+      "level": 12,
+      "rawChampionName": "game_character_displayname_Thresh",
+      "respawnTimer": 0,
+      "riotId": "FixturePlayer#BR1",
+      "riotIdGameName": "FixturePlayer",
+      "riotIdTagLine": "BR1",
+      "runes": {
+        "keystone": {
+          "displayName": "Aftershock",
+          "id": 8439,
+          "rawDescription": "perk_tooltip_Aftershock",
+          "rawDisplayName": "perk_displayname_Aftershock"
+        },
+        "primaryRuneTree": {
+          "displayName": "Resolve",
+          "id": 8400,
+          "rawDescription": "perkstyle_tooltip_Resolve",
+          "rawDisplayName": "perkstyle_displayname_Resolve"
+        },
+        "secondaryRuneTree": {
+          "displayName": "Inspiration",
+          "id": 8300,
+          "rawDescription": "perkstyle_tooltip_Inspiration",
+          "rawDisplayName": "perkstyle_displayname_Inspiration"
+        }
+      },
+      "scores": {
+        "kills": 2,
+        "deaths": 1,
+        "assists": 3,
+        "creepScore": 0,
+        "wardScore": 9.5
+      },
+      "skinID": 0,
+      "summonerName": "FixturePlayer",
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Flash",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Ignite",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerDot_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerDot_DisplayName"
+        }
+      },
+      "team": "ORDER",
+      "subteam": 1
+    },
+    {
+      "championName": "Jax",
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Fixture item 3078",
+          "itemID": 3078,
+          "price": 0,
+          "rawDescription": "game_item_description_3078",
+          "rawDisplayName": "game_item_displayname_3078",
+          "slot": 0
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Fixture item 3047",
+          "itemID": 3047,
+          "price": 0,
+          "rawDescription": "game_item_description_3047",
+          "rawDisplayName": "game_item_displayname_3047",
+          "slot": 1
+        }
+      ],
+      "level": 12,
+      "rawChampionName": "game_character_displayname_Jax",
+      "respawnTimer": 0,
+      "riotId": "ArenaPartner#BR1",
+      "riotIdGameName": "ArenaPartner",
+      "riotIdTagLine": "BR1",
+      "runes": {
+        "keystone": {
+          "displayName": "Aftershock",
+          "id": 8439,
+          "rawDescription": "perk_tooltip_Aftershock",
+          "rawDisplayName": "perk_displayname_Aftershock"
+        },
+        "primaryRuneTree": {
+          "displayName": "Resolve",
+          "id": 8400,
+          "rawDescription": "perkstyle_tooltip_Resolve",
+          "rawDisplayName": "perkstyle_displayname_Resolve"
+        },
+        "secondaryRuneTree": {
+          "displayName": "Inspiration",
+          "id": 8300,
+          "rawDescription": "perkstyle_tooltip_Inspiration",
+          "rawDisplayName": "perkstyle_displayname_Inspiration"
+        }
+      },
+      "scores": {
+        "kills": 3,
+        "deaths": 2,
+        "assists": 2,
+        "creepScore": 0,
+        "wardScore": 9.5
+      },
+      "skinID": 0,
+      "summonerName": "ArenaPartner",
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Flash",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Ignite",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerDot_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerDot_DisplayName"
+        }
+      },
+      "team": "ORDER",
+      "subteam": 1
+    },
+    {
+      "championName": "Ahri",
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Fixture item 6655",
+          "itemID": 6655,
+          "price": 0,
+          "rawDescription": "game_item_description_6655",
+          "rawDisplayName": "game_item_displayname_6655",
+          "slot": 0
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Fixture item 3020",
+          "itemID": 3020,
+          "price": 0,
+          "rawDescription": "game_item_description_3020",
+          "rawDisplayName": "game_item_displayname_3020",
+          "slot": 1
+        }
+      ],
+      "level": 12,
+      "rawChampionName": "game_character_displayname_Ahri",
+      "respawnTimer": 0,
+      "riotId": "ArenaThree#BR1",
+      "riotIdGameName": "ArenaThree",
+      "riotIdTagLine": "BR1",
+      "runes": {
+        "keystone": {
+          "displayName": "Aftershock",
+          "id": 8439,
+          "rawDescription": "perk_tooltip_Aftershock",
+          "rawDisplayName": "perk_displayname_Aftershock"
+        },
+        "primaryRuneTree": {
+          "displayName": "Resolve",
+          "id": 8400,
+          "rawDescription": "perkstyle_tooltip_Resolve",
+          "rawDisplayName": "perkstyle_displayname_Resolve"
+        },
+        "secondaryRuneTree": {
+          "displayName": "Inspiration",
+          "id": 8300,
+          "rawDescription": "perkstyle_tooltip_Inspiration",
+          "rawDisplayName": "perkstyle_displayname_Inspiration"
+        }
+      },
+      "scores": {
+        "kills": 2,
+        "deaths": 2,
+        "assists": 1,
+        "creepScore": 0,
+        "wardScore": 9.5
+      },
+      "skinID": 0,
+      "summonerName": "ArenaThree",
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Flash",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Ignite",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerDot_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerDot_DisplayName"
+        }
+      },
+      "team": "CHAOS",
+      "subteam": 2
+    },
+    {
+      "championName": "Garen",
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Fixture item 3071",
+          "itemID": 3071,
+          "price": 0,
+          "rawDescription": "game_item_description_3071",
+          "rawDisplayName": "game_item_displayname_3071",
+          "slot": 0
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Fixture item 3047",
+          "itemID": 3047,
+          "price": 0,
+          "rawDescription": "game_item_description_3047",
+          "rawDisplayName": "game_item_displayname_3047",
+          "slot": 1
+        }
+      ],
+      "level": 12,
+      "rawChampionName": "game_character_displayname_Garen",
+      "respawnTimer": 0,
+      "riotId": "ArenaFour#BR1",
+      "riotIdGameName": "ArenaFour",
+      "riotIdTagLine": "BR1",
+      "runes": {
+        "keystone": {
+          "displayName": "Aftershock",
+          "id": 8439,
+          "rawDescription": "perk_tooltip_Aftershock",
+          "rawDisplayName": "perk_displayname_Aftershock"
+        },
+        "primaryRuneTree": {
+          "displayName": "Resolve",
+          "id": 8400,
+          "rawDescription": "perkstyle_tooltip_Resolve",
+          "rawDisplayName": "perkstyle_displayname_Resolve"
+        },
+        "secondaryRuneTree": {
+          "displayName": "Inspiration",
+          "id": 8300,
+          "rawDescription": "perkstyle_tooltip_Inspiration",
+          "rawDisplayName": "perkstyle_displayname_Inspiration"
+        }
+      },
+      "scores": {
+        "kills": 1,
+        "deaths": 2,
+        "assists": 3,
+        "creepScore": 0,
+        "wardScore": 9.5
+      },
+      "skinID": 0,
+      "summonerName": "ArenaFour",
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Flash",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Ignite",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerDot_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerDot_DisplayName"
+        }
+      },
+      "team": "CHAOS",
+      "subteam": 2
+    },
+    {
+      "championName": "Vi",
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Fixture item 3078",
+          "itemID": 3078,
+          "price": 0,
+          "rawDescription": "game_item_description_3078",
+          "rawDisplayName": "game_item_displayname_3078",
+          "slot": 0
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Fixture item 3111",
+          "itemID": 3111,
+          "price": 0,
+          "rawDescription": "game_item_description_3111",
+          "rawDisplayName": "game_item_displayname_3111",
+          "slot": 1
+        }
+      ],
+      "level": 12,
+      "rawChampionName": "game_character_displayname_Vi",
+      "respawnTimer": 0,
+      "riotId": "ArenaFive#BR1",
+      "riotIdGameName": "ArenaFive",
+      "riotIdTagLine": "BR1",
+      "runes": {
+        "keystone": {
+          "displayName": "Aftershock",
+          "id": 8439,
+          "rawDescription": "perk_tooltip_Aftershock",
+          "rawDisplayName": "perk_displayname_Aftershock"
+        },
+        "primaryRuneTree": {
+          "displayName": "Resolve",
+          "id": 8400,
+          "rawDescription": "perkstyle_tooltip_Resolve",
+          "rawDisplayName": "perkstyle_displayname_Resolve"
+        },
+        "secondaryRuneTree": {
+          "displayName": "Inspiration",
+          "id": 8300,
+          "rawDescription": "perkstyle_tooltip_Inspiration",
+          "rawDisplayName": "perkstyle_displayname_Inspiration"
+        }
+      },
+      "scores": {
+        "kills": 4,
+        "deaths": 1,
+        "assists": 2,
+        "creepScore": 0,
+        "wardScore": 9.5
+      },
+      "skinID": 0,
+      "summonerName": "ArenaFive",
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Flash",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Ignite",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerDot_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerDot_DisplayName"
+        }
+      },
+      "team": "ORDER",
+      "subteam": 3
+    },
+    {
+      "championName": "Lux",
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Fixture item 3089",
+          "itemID": 3089,
+          "price": 0,
+          "rawDescription": "game_item_description_3089",
+          "rawDisplayName": "game_item_displayname_3089",
+          "slot": 0
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Fixture item 3020",
+          "itemID": 3020,
+          "price": 0,
+          "rawDescription": "game_item_description_3020",
+          "rawDisplayName": "game_item_displayname_3020",
+          "slot": 1
+        }
+      ],
+      "level": 12,
+      "rawChampionName": "game_character_displayname_Lux",
+      "respawnTimer": 0,
+      "riotId": "ArenaSix#BR1",
+      "riotIdGameName": "ArenaSix",
+      "riotIdTagLine": "BR1",
+      "runes": {
+        "keystone": {
+          "displayName": "Aftershock",
+          "id": 8439,
+          "rawDescription": "perk_tooltip_Aftershock",
+          "rawDisplayName": "perk_displayname_Aftershock"
+        },
+        "primaryRuneTree": {
+          "displayName": "Resolve",
+          "id": 8400,
+          "rawDescription": "perkstyle_tooltip_Resolve",
+          "rawDisplayName": "perkstyle_displayname_Resolve"
+        },
+        "secondaryRuneTree": {
+          "displayName": "Inspiration",
+          "id": 8300,
+          "rawDescription": "perkstyle_tooltip_Inspiration",
+          "rawDisplayName": "perkstyle_displayname_Inspiration"
+        }
+      },
+      "scores": {
+        "kills": 2,
+        "deaths": 1,
+        "assists": 4,
+        "creepScore": 0,
+        "wardScore": 9.5
+      },
+      "skinID": 0,
+      "summonerName": "ArenaSix",
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Flash",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Ignite",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerDot_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerDot_DisplayName"
+        }
+      },
+      "team": "ORDER",
+      "subteam": 3
+    },
+    {
+      "championName": "Jinx",
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Fixture item 3031",
+          "itemID": 3031,
+          "price": 0,
+          "rawDescription": "game_item_description_3031",
+          "rawDisplayName": "game_item_displayname_3031",
+          "slot": 0
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Fixture item 3006",
+          "itemID": 3006,
+          "price": 0,
+          "rawDescription": "game_item_description_3006",
+          "rawDisplayName": "game_item_displayname_3006",
+          "slot": 1
+        }
+      ],
+      "level": 12,
+      "rawChampionName": "game_character_displayname_Jinx",
+      "respawnTimer": 0,
+      "riotId": "ArenaSeven#BR1",
+      "riotIdGameName": "ArenaSeven",
+      "riotIdTagLine": "BR1",
+      "runes": {
+        "keystone": {
+          "displayName": "Aftershock",
+          "id": 8439,
+          "rawDescription": "perk_tooltip_Aftershock",
+          "rawDisplayName": "perk_displayname_Aftershock"
+        },
+        "primaryRuneTree": {
+          "displayName": "Resolve",
+          "id": 8400,
+          "rawDescription": "perkstyle_tooltip_Resolve",
+          "rawDisplayName": "perkstyle_displayname_Resolve"
+        },
+        "secondaryRuneTree": {
+          "displayName": "Inspiration",
+          "id": 8300,
+          "rawDescription": "perkstyle_tooltip_Inspiration",
+          "rawDisplayName": "perkstyle_displayname_Inspiration"
+        }
+      },
+      "scores": {
+        "kills": 1,
+        "deaths": 3,
+        "assists": 1,
+        "creepScore": 0,
+        "wardScore": 9.5
+      },
+      "skinID": 0,
+      "summonerName": "ArenaSeven",
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Flash",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Ignite",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerDot_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerDot_DisplayName"
+        }
+      },
+      "team": "CHAOS",
+      "subteam": 4
+    },
+    {
+      "championName": "Leona",
+      "isBot": false,
+      "isDead": false,
+      "items": [
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Fixture item 3190",
+          "itemID": 3190,
+          "price": 0,
+          "rawDescription": "game_item_description_3190",
+          "rawDisplayName": "game_item_displayname_3190",
+          "slot": 0
+        },
+        {
+          "canUse": false,
+          "consumable": false,
+          "count": 1,
+          "displayName": "Fixture item 3111",
+          "itemID": 3111,
+          "price": 0,
+          "rawDescription": "game_item_description_3111",
+          "rawDisplayName": "game_item_displayname_3111",
+          "slot": 1
+        }
+      ],
+      "level": 12,
+      "rawChampionName": "game_character_displayname_Leona",
+      "respawnTimer": 0,
+      "riotId": "ArenaEight#BR1",
+      "riotIdGameName": "ArenaEight",
+      "riotIdTagLine": "BR1",
+      "runes": {
+        "keystone": {
+          "displayName": "Aftershock",
+          "id": 8439,
+          "rawDescription": "perk_tooltip_Aftershock",
+          "rawDisplayName": "perk_displayname_Aftershock"
+        },
+        "primaryRuneTree": {
+          "displayName": "Resolve",
+          "id": 8400,
+          "rawDescription": "perkstyle_tooltip_Resolve",
+          "rawDisplayName": "perkstyle_displayname_Resolve"
+        },
+        "secondaryRuneTree": {
+          "displayName": "Inspiration",
+          "id": 8300,
+          "rawDescription": "perkstyle_tooltip_Inspiration",
+          "rawDisplayName": "perkstyle_displayname_Inspiration"
+        }
+      },
+      "scores": {
+        "kills": 0,
+        "deaths": 3,
+        "assists": 2,
+        "creepScore": 0,
+        "wardScore": 9.5
+      },
+      "skinID": 0,
+      "summonerName": "ArenaEight",
+      "summonerSpells": {
+        "summonerSpellOne": {
+          "displayName": "Flash",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerFlash_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerFlash_DisplayName"
+        },
+        "summonerSpellTwo": {
+          "displayName": "Ignite",
+          "rawDescription": "GeneratedTip_SummonerSpell_SummonerDot_Description",
+          "rawDisplayName": "GeneratedTip_SummonerSpell_SummonerDot_DisplayName"
+        }
+      },
+      "team": "CHAOS",
+      "subteam": 4
+    }
+  ],
+  "events": {
+    "Events": [
+      {
+        "EventID": 0,
+        "EventName": "GameStart",
+        "EventTime": 0
+      }
+    ]
+  },
+  "gameData": {
+    "gameMode": "CHERRY",
+    "gameTime": 458.25,
+    "mapName": "Map30",
+    "mapNumber": 30,
+    "mapTerrain": "Default"
+  }
+}

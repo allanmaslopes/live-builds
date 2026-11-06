@@ -41,4 +41,5 @@ No fim, o script imprime CPU média, p95 e máxima, RAM de trabalho (WS) média 
 | Data | Versão | Cenário | CPU média (% de 1 núcleo) | CPU p95 | RAM média (WS MB) | RAM máx | Observações |
 |---|---|---|---|---|---|---|---|
 | 2026-11-06 | 9b9de8d (egui + glow) | Fora de partida, janela visível, 60 s | 0,48 (0,03% de 16 núcleos) | 3,0 | 76,7 | 79,3 | Private máx 156 MB. Quase toda a RAM vem do driver OpenGL da AMD RX 6750 XT. Acima da meta de 30 MB. |
+| 2026-11-06 | 9b9de8d (egui + glow) | **Em partida** (personalizada, Summoner's Rift vs bots), 600 s, polling 1 s, gravação ligada | 0,48 (0,03% de 16 núcleos) | 3,0 | 94,3 | 96,7 | Private máx 162 MB. Mesmo período, o próprio LoL: CPU 8,69% do total (≈139% de 1 núcleo), WS 1.015 MB. O live-builds usa ~1/18 da CPU e ~1/11 da RAM do jogo. CPU dentro da meta; RAM acima de 60 MB. |
 | 2026-11-06 | spike (egui + wgpu DX12) | Fora de partida, janela visível, 60 s | 8,2 (0,51% de 16 núcleos) | 94,6 | 210,5 | 210,9 | Private máx 508 MB. Descartado: muito pior que o glow. |

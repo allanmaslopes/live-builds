@@ -1,0 +1,170 @@
+{
+  "{44427803}": {
+    "RecSpellRankUpInfos": [
+      {
+        "MapId": 11,
+        "Position": "utility",
+        "IsDefaultRecommendation": true,
+        "mDefaultPriority": [
+          3,
+          0,
+          2,
+          1
+        ],
+        "mEarlyLevelOverrides": [
+          0,
+          2,
+          1,
+          0
+        ],
+        "__type": "RecSpellRankUpInfo"
+      },
+      {
+        "MapId": 12,
+        "Position": "None",
+        "mDefaultPriority": [
+          3,
+          0,
+          2,
+          1
+        ],
+        "mEarlyLevelOverrides": [
+          0,
+          1,
+          2,
+          0
+        ],
+        "__type": "RecSpellRankUpInfo"
+      }
+    ],
+    "__type": "RecSpellRankUpInfoList"
+  },
+  "{cccf4b1c}": {
+    "mOverrides": [
+      {
+        "mOverrideContexts": [
+          {
+            "mMapID": 11,
+            "mModeNameStringId": "CLASSIC",
+            "__type": "ItemRecommendationOverrideContext"
+          }
+        ],
+        "StartingItemBundles": [
+          {
+            "items": [
+              "Items/3865",
+              "Items/2003",
+              "Items/2003"
+            ],
+            "__type": "ItemRecommendationOverrideStartingItemBundle"
+          }
+        ],
+        "mRecItemRanges": [
+          {
+            "items": [
+              "Items/3190",
+              "Items/2065"
+            ],
+            "MaxCompletedItems": 0,
+            "__type": "ItemRecOverrideRange"
+          },
+          {
+            "items": [
+              "Items/3047",
+              "Items/3111",
+              "Items/3117"
+            ],
+            "__type": "ItemRecOverrideRange"
+          },
+          {
+            "items": [
+              "Items/3050",
+              "Items/3109",
+              "Items/3075"
+            ],
+            "MaxCompletedItems": 3,
+            "__type": "ItemRecOverrideRange"
+          },
+          {
+            "items": [
+              "Items/4638",
+              "Items/3143",
+              "Items/4401",
+              "Items/3075",
+              "Items/3110",
+              "Items/3107"
+            ],
+            "__type": "ItemRecOverrideRange"
+          }
+        ],
+        "mCoreItems": [
+          "Items/3869",
+          "Items/3876"
+        ],
+        "__type": "ItemRecommendationOverride"
+      },
+      {
+        "mOverrideContexts": [
+          {
+            "mMapID": 12,
+            "mModeNameStringId": "ARAM",
+            "__type": "ItemRecommendationOverrideContext"
+          }
+        ],
+        "StartingItemBundles": [
+          {
+            "items": [
+              "Items/2051"
+            ],
+            "__type": "ItemRecommendationOverrideStartingItemBundle"
+          },
+          {
+            "items": [
+              "Items/6660"
+            ],
+            "__type": "ItemRecommendationOverrideStartingItemBundle"
+          }
+        ],
+        "mRecItemRanges": [
+          {
+            "items": [
+              "Items/3190",
+              "Items/2065",
+              "Items/3068"
+            ],
+            "__type": "ItemRecOverrideRange"
+          },
+          {
+            "items": [
+              "Items/3047",
+              "Items/3111",
+              "Items/3117"
+            ],
+            "__type": "ItemRecOverrideRange"
+          },
+          {
+            "items": [
+              "Items/3050",
+              "Items/3109",
+              "Items/3001"
+            ],
+            "MaxCompletedItems": 3,
+            "__type": "ItemRecOverrideRange"
+          },
+          {
+            "items": [
+              "Items/3193",
+              "Items/3143",
+              "Items/4641",
+              "Items/4401",
+              "Items/3107"
+            ],
+            "__type": "ItemRecOverrideRange"
+          }
+        ],
+        "__type": "ItemRecommendationOverride"
+      }
+    ],
+    "__type": "ItemRecommendationOverrideSet"
+  }
+}

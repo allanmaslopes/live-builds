@@ -83,6 +83,7 @@ impl ItemCatalog {
         })
     }
 
+    /// `None` means the item is unknown; consumers must never treat it as purchasable.
     pub fn get(&self, id: u32) -> Option<&Item> {
         self.items.get(&id)
     }

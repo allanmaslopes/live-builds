@@ -1,0 +1,465 @@
+{
+    "type":  "item",
+    "version":  "16.22.1",
+    "data":  {
+                 "3071":  {
+                              "name":  "Cutelo Negro",
+                              "description":  "\u003cmainText\u003e\u003cstats\u003e\u003cattention\u003e45\u003c/attention\u003e de Dano de Ataque\u003cbr\u003e\u003cattention\u003e400\u003c/attention\u003e de Vida\u003cbr\u003e\u003cattention\u003e20\u003c/attention\u003e de Aceleração de Habilidade\u003c/stats\u003e\u003cbr\u003e\u003cbr\u003e\u003cpassive\u003eTalhar\u003c/passive\u003e\u003cbr\u003eCausar \u003cphysicalDamage\u003eDano Físico\u003c/physicalDamage\u003e a Campeões reduz a \u003cscaleArmor\u003eArmadura do alvo em 6%\u003c/scaleArmor\u003e por 6s (acumula 5x).\u003cbr\u003e\u003cbr\u003e\u003cpassive\u003eFervor\u003c/passive\u003e\u003cbr\u003eCausar \u003cphysicalDamage\u003eDano Físico\u003c/physicalDamage\u003e concede \u003cspeed\u003e0 de Velocidade de Movimento\u003c/speed\u003e por 2s.\u003c/mainText\u003e",
+                              "colloq":  ";bc;black cleaver;black",
+                              "plaintext":  "Causar dano físico reduz Armadura de Campeões inimigos",
+                              "from":  [
+                                           "3044",
+                                           "3067",
+                                           "1037"
+                                       ],
+                              "image":  {
+                                            "full":  "3071.png",
+                                            "sprite":  "item3.png",
+                                            "group":  "item",
+                                            "x":  96,
+                                            "y":  240,
+                                            "w":  48,
+                                            "h":  48
+                                        },
+                              "gold":  {
+                                           "base":  225,
+                                           "purchasable":  true,
+                                           "total":  3000,
+                                           "sell":  2100
+                                       },
+                              "tags":  [
+                                           "Health",
+                                           "Damage",
+                                           "CooldownReduction",
+                                           "OnHit",
+                                           "NonbootsMovement",
+                                           "ArmorPenetration",
+                                           "AbilityHaste"
+                                       ],
+                              "maps":  {
+                                           "11":  true,
+                                           "12":  true,
+                                           "22":  false,
+                                           "30":  false,
+                                           "453":  true
+                                       },
+                              "stats":  {
+                                            "FlatHPPoolMod":  400,
+                                            "FlatPhysicalDamageMod":  45
+                                        },
+                              "depth":  3
+                          },
+                 "3044":  {
+                              "name":  "Fago",
+                              "description":  "\u003cmainText\u003e\u003cstats\u003e\u003cattention\u003e15\u003c/attention\u003e de Dano de Ataque\u003cbr\u003e\u003cattention\u003e200\u003c/attention\u003e de Vida\u003c/stats\u003e\u003cbr\u003e\u003cbr\u003e\u003cpassive\u003eFúria\u003c/passive\u003e\u003cbr\u003eAtaques concedem \u003cspeed\u003eVelocidade de Movimento\u003c/speed\u003e por 2s.\u003c/mainText\u003e",
+                              "colloq":  ";phage",
+                              "plaintext":  "Ataques e abates dão um efeito curto de velocidade",
+                              "from":  [
+                                           "1028",
+                                           "1036"
+                                       ],
+                              "into":  [
+                                           "3071",
+                                           "3078",
+                                           "3073",
+                                           "6630",
+                                           "6631"
+                                       ],
+                              "image":  {
+                                            "full":  "3044.png",
+                                            "sprite":  "item3.png",
+                                            "group":  "item",
+                                            "x":  0,
+                                            "y":  192,
+                                            "w":  48,
+                                            "h":  48
+                                        },
+                              "gold":  {
+                                           "base":  350,
+                                           "purchasable":  true,
+                                           "total":  1100,
+                                           "sell":  770
+                                       },
+                              "tags":  [
+                                           "Health",
+                                           "Damage",
+                                           "NonbootsMovement"
+                                       ],
+                              "maps":  {
+                                           "11":  true,
+                                           "12":  true,
+                                           "22":  false,
+                                           "30":  false,
+                                           "453":  true
+                                       },
+                              "stats":  {
+                                            "FlatHPPoolMod":  200,
+                                            "FlatPhysicalDamageMod":  15
+                                        },
+                              "effect":  {
+                                             "Effect1Amount":  "20",
+                                             "Effect2Amount":  "2",
+                                             "Effect3Amount":  "60",
+                                             "Effect4Amount":  "0",
+                                             "Effect5Amount":  "0",
+                                             "Effect6Amount":  "0",
+                                             "Effect7Amount":  "0",
+                                             "Effect8Amount":  "8"
+                                         },
+                              "depth":  2
+                          },
+                 "3067":  {
+                              "name":  "Gema Ardente",
+                              "description":  "\u003cmainText\u003e\u003cstats\u003e\u003cattention\u003e200\u003c/attention\u003e de Vida\u003cbr\u003e\u003cattention\u003e10\u003c/attention\u003e de Aceleração de Habilidade\u003c/stats\u003e\u003cbr\u003e\u003cbr\u003e\u003c/mainText\u003e",
+                              "colloq":  ";kindlegem",
+                              "plaintext":  "Aumenta a Vida e a Redução do Tempo de Recarga",
+                              "from":  [
+                                           "1028",
+                                           "2022"
+                                       ],
+                              "into":  [
+                                           "3071",
+                                           "8020",
+                                           "323050",
+                                           "328020",
+                                           "124011",
+                                           "323190",
+                                           "323222",
+                                           "3165",
+                                           "6620",
+                                           "3050",
+                                           "3109",
+                                           "6656",
+                                           "326617",
+                                           "323107",
+                                           "2502",
+                                           "2510",
+                                           "2524",
+                                           "2525",
+                                           "6617",
+                                           "3065",
+                                           "3152",
+                                           "3119",
+                                           "326620",
+                                           "3190",
+                                           "3222",
+                                           "323109",
+                                           "323119",
+                                           "4403",
+                                           "4629",
+                                           "4644",
+                                           "6630",
+                                           "6632",
+                                           "8001"
+                                       ],
+                              "image":  {
+                                            "full":  "3067.png",
+                                            "sprite":  "item3.png",
+                                            "group":  "item",
+                                            "x":  432,
+                                            "y":  192,
+                                            "w":  48,
+                                            "h":  48
+                                        },
+                              "gold":  {
+                                           "base":  150,
+                                           "purchasable":  true,
+                                           "total":  800,
+                                           "sell":  560
+                                       },
+                              "tags":  [
+                                           "Health",
+                                           "CooldownReduction",
+                                           "AbilityHaste"
+                                       ],
+                              "maps":  {
+                                           "11":  true,
+                                           "12":  true,
+                                           "22":  false,
+                                           "30":  false,
+                                           "453":  true
+                                       },
+                              "stats":  {
+                                            "FlatHPPoolMod":  200
+                                        },
+                              "depth":  2
+                          },
+                 "1037":  {
+                              "name":  "Picareta",
+                              "description":  "\u003cmainText\u003e\u003cstats\u003e\u003cattention\u003e25\u003c/attention\u003e de Dano de Ataque\u003c/stats\u003e\u003cbr\u003e\u003cbr\u003e\u003c/mainText\u003e",
+                              "colloq":  ";pickaxe",
+                              "plaintext":  "Aumenta moderadamente o Dano de Ataque",
+                              "into":  [
+                                           "667666",
+                                           "3071",
+                                           "6333",
+                                           "3031",
+                                           "3153",
+                                           "6701",
+                                           "2020",
+                                           "2517",
+                                           "3087",
+                                           "6695",
+                                           "2523",
+                                           "3053",
+                                           "3072",
+                                           "3124",
+                                           "3181",
+                                           "3139",
+                                           "3161",
+                                           "6029",
+                                           "6035",
+                                           "6673",
+                                           "6676",
+                                           "6692"
+                                       ],
+                              "image":  {
+                                            "full":  "1037.png",
+                                            "sprite":  "item0.png",
+                                            "group":  "item",
+                                            "x":  144,
+                                            "y":  48,
+                                            "w":  48,
+                                            "h":  48
+                                        },
+                              "gold":  {
+                                           "base":  875,
+                                           "purchasable":  true,
+                                           "total":  875,
+                                           "sell":  613
+                                       },
+                              "tags":  [
+                                           "Damage"
+                                       ],
+                              "maps":  {
+                                           "11":  true,
+                                           "12":  true,
+                                           "22":  false,
+                                           "30":  false,
+                                           "453":  true
+                                       },
+                              "stats":  {
+                                            "FlatPhysicalDamageMod":  25
+                                        }
+                          },
+                 "1028":  {
+                              "name":  "Cristal de Rubi",
+                              "description":  "\u003cmainText\u003e\u003cstats\u003e\u003cattention\u003e150\u003c/attention\u003e de Vida\u003c/stats\u003e\u003cbr\u003e\u003cbr\u003e\u003c/mainText\u003e",
+                              "colloq":  ";red;vermelho;vermelha;crystal;ruby",
+                              "plaintext":  "Aumenta a Vida",
+                              "into":  [
+                                           "3742",
+                                           "1011",
+                                           "3068",
+                                           "2021",
+                                           "323222",
+                                           "323075",
+                                           "326617",
+                                           "323107",
+                                           "3012",
+                                           "3147",
+                                           "3067",
+                                           "3211",
+                                           "2502",
+                                           "322526",
+                                           "2526",
+                                           "3023",
+                                           "3044",
+                                           "3053",
+                                           "3066",
+                                           "3075",
+                                           "3152",
+                                           "3161",
+                                           "3801",
+                                           "3803",
+                                           "4401",
+                                           "4635",
+                                           "6035",
+                                           "6660",
+                                           "6662"
+                                       ],
+                              "image":  {
+                                            "full":  "1028.png",
+                                            "sprite":  "item0.png",
+                                            "group":  "item",
+                                            "x":  336,
+                                            "y":  0,
+                                            "w":  48,
+                                            "h":  48
+                                        },
+                              "gold":  {
+                                           "base":  400,
+                                           "purchasable":  true,
+                                           "total":  400,
+                                           "sell":  280
+                                       },
+                              "tags":  [
+                                           "Health"
+                                       ],
+                              "maps":  {
+                                           "11":  true,
+                                           "12":  true,
+                                           "22":  false,
+                                           "30":  false,
+                                           "453":  true
+                                       },
+                              "stats":  {
+                                            "FlatHPPoolMod":  150
+                                        }
+                          },
+                 "1036":  {
+                              "name":  "Espada Longa",
+                              "description":  "\u003cmainText\u003e\u003cstats\u003e\u003cattention\u003e10\u003c/attention\u003e de Dano de Ataque\u003c/stats\u003e\u003cbr\u003e\u003cbr\u003e\u003c/mainText\u003e",
+                              "colloq":  ";long sword;long;sword",
+                              "plaintext":  "Aumenta levemente o Dano de Ataque",
+                              "into":  [
+                                           "1053",
+                                           "4003",
+                                           "6701",
+                                           "2015",
+                                           "2019",
+                                           "2021",
+                                           "3077",
+                                           "6670",
+                                           "3133",
+                                           "2517",
+                                           "323004",
+                                           "3142",
+                                           "3004",
+                                           "2523",
+                                           "3032",
+                                           "3035",
+                                           "3044",
+                                           "3051",
+                                           "3155",
+                                           "6690",
+                                           "3123",
+                                           "3134",
+                                           "6699",
+                                           "6671",
+                                           "6692"
+                                       ],
+                              "image":  {
+                                            "full":  "1036.png",
+                                            "sprite":  "item0.png",
+                                            "group":  "item",
+                                            "x":  96,
+                                            "y":  48,
+                                            "w":  48,
+                                            "h":  48
+                                        },
+                              "gold":  {
+                                           "base":  350,
+                                           "purchasable":  true,
+                                           "total":  350,
+                                           "sell":  245
+                                       },
+                              "tags":  [
+                                           "Damage",
+                                           "Lane"
+                                       ],
+                              "maps":  {
+                                           "11":  true,
+                                           "12":  true,
+                                           "22":  false,
+                                           "30":  false,
+                                           "453":  true
+                                       },
+                              "stats":  {
+                                            "FlatPhysicalDamageMod":  10
+                                        }
+                          },
+                 "2022":  {
+                              "name":  "Partícula Brilhante",
+                              "description":  "\u003cmainText\u003e\u003cstats\u003e\u003cattention\u003e5\u003c/attention\u003e de Aceleração de Habilidade\u003c/stats\u003e\u003cbr\u003e\u003cbr\u003e\u003c/mainText\u003e",
+                              "colloq":  "",
+                              "plaintext":  "",
+                              "into":  [
+                                           "2020",
+                                           "3024",
+                                           "3133",
+                                           "3802",
+                                           "3067",
+                                           "3057",
+                                           "3108",
+                                           "3158",
+                                           "4642",
+                                           "6660"
+                                       ],
+                              "image":  {
+                                            "full":  "2022.png",
+                                            "sprite":  "item0.png",
+                                            "group":  "item",
+                                            "x":  192,
+                                            "y":  432,
+                                            "w":  48,
+                                            "h":  48
+                                        },
+                              "gold":  {
+                                           "base":  250,
+                                           "purchasable":  true,
+                                           "total":  250,
+                                           "sell":  175
+                                       },
+                              "tags":  [
+                                           "CooldownReduction"
+                                       ],
+                              "maps":  {
+                                           "11":  true,
+                                           "12":  true,
+                                           "22":  false,
+                                           "30":  false,
+                                           "453":  true
+                                       },
+                              "stats":  {
+
+                                        }
+                          },
+                 "3077":  {
+                              "name":  "Tiamat",
+                              "description":  "\u003cmainText\u003e\u003cstats\u003e\u003cattention\u003e25\u003c/attention\u003e de Dano de Ataque\u003c/stats\u003e\u003cbr\u003e\u003cbr\u003e\u003cpassive\u003eFenda\u003c/passive\u003e\u003cbr\u003eAtaques causam \u003cphysicalDamage\u003eDano Físico\u003c/physicalDamage\u003e a inimigos próximos.\u003cbr\u003e\u003cactive\u003eCrescente\u003c/active\u003e\u003cbr\u003eCausa \u003cphysicalDamage\u003eDano Físico\u003c/physicalDamage\u003e a inimigos ao seu redor.\u003c/mainText\u003e",
+                              "colloq":  ";tiamat",
+                              "plaintext":  "Ataques corpo a corpo atingem inimigos próximos",
+                              "from":  [
+                                           "1036",
+                                           "1036"
+                                       ],
+                              "into":  [
+                                           "3074",
+                                           "3748",
+                                           "6698",
+                                           "6631"
+                                       ],
+                              "image":  {
+                                            "full":  "3077.png",
+                                            "sprite":  "item3.png",
+                                            "group":  "item",
+                                            "x":  384,
+                                            "y":  240,
+                                            "w":  48,
+                                            "h":  48
+                                        },
+                              "gold":  {
+                                           "base":  500,
+                                           "purchasable":  true,
+                                           "total":  1200,
+                                           "sell":  840
+                                       },
+                              "tags":  [
+                                           "Damage",
+                                           "OnHit"
+                                       ],
+                              "maps":  {
+                                           "11":  true,
+                                           "12":  true,
+                                           "22":  false,
+                                           "30":  false,
+                                           "453":  true
+                                       },
+                              "stats":  {
+                                            "FlatPhysicalDamageMod":  25
+                                        },
+                              "depth":  2
+                          }
+             }
+}

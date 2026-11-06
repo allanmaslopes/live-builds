@@ -1,3 +1,5 @@
+use serde_json::Value;
+
 pub struct ItemStage {
     pub items: Vec<u32>,
     pub max_completed: Option<u32>,
@@ -172,4 +174,3 @@ mod tests {
         assert_eq!(skills.early, vec![0, 1, 2, 0]);
     }
 }
-use serde_json::Value;

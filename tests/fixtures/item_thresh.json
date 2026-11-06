@@ -1,0 +1,277 @@
+{
+ "type": "item",
+ "version": "16.22.1",
+ "data": {
+  "1001": {
+   "name": "Botas",
+   "from": [],
+   "gold": {
+    "base": 300,
+    "purchasable": true,
+    "total": 300,
+    "sell": 210
+   }
+  },
+  "1004": {
+   "name": "Amuleto da Fada",
+   "from": [],
+   "gold": {
+    "base": 200,
+    "purchasable": true,
+    "total": 200,
+    "sell": 140
+   }
+  },
+  "1006": {
+   "name": "Pérola do Rejuvenescimento",
+   "from": [],
+   "gold": {
+    "base": 300,
+    "purchasable": true,
+    "total": 300,
+    "sell": 120
+   }
+  },
+  "1028": {
+   "name": "Cristal de Rubi",
+   "from": [],
+   "gold": {
+    "base": 400,
+    "purchasable": true,
+    "total": 400,
+    "sell": 280
+   }
+  },
+  "1029": {
+   "name": "Couraça de Pano",
+   "from": [],
+   "gold": {
+    "base": 300,
+    "purchasable": true,
+    "total": 300,
+    "sell": 210
+   }
+  },
+  "1031": {
+   "name": "Cota de Malha",
+   "from": [
+    "1029"
+   ],
+   "gold": {
+    "base": 500,
+    "purchasable": true,
+    "total": 800,
+    "sell": 560
+   }
+  },
+  "1033": {
+   "name": "Manto Anula-Magia",
+   "from": [],
+   "gold": {
+    "base": 400,
+    "purchasable": true,
+    "total": 400,
+    "sell": 280
+   }
+  },
+  "1052": {
+   "name": "Tomo Amplificador",
+   "from": [],
+   "gold": {
+    "base": 400,
+    "purchasable": true,
+    "total": 400,
+    "sell": 280
+   }
+  },
+  "2003": {
+   "name": "Poção de Vida",
+   "from": [],
+   "gold": {
+    "base": 50,
+    "purchasable": true,
+    "total": 50,
+    "sell": 20
+   }
+  },
+  "2022": {
+   "name": "Partícula Brilhante",
+   "from": [],
+   "gold": {
+    "base": 250,
+    "purchasable": true,
+    "total": 250,
+    "sell": 175
+   }
+  },
+  "2065": {
+   "name": "Hino Bélico de Shurelya",
+   "from": [
+    "3113",
+    "4642"
+   ],
+   "gold": {
+    "base": 400,
+    "purchasable": true,
+    "total": 2200,
+    "sell": 1540
+   }
+  },
+  "3047": {
+   "name": "Botas Galvanizadas de Aço",
+   "from": [
+    "1001",
+    "1029"
+   ],
+   "gold": {
+    "base": 600,
+    "purchasable": true,
+    "total": 1200,
+    "sell": 840
+   }
+  },
+  "3050": {
+   "name": "Convergência de Zeke",
+   "from": [
+    "3067",
+    "1029",
+    "1033"
+   ],
+   "gold": {
+    "base": 700,
+    "purchasable": true,
+    "total": 2200,
+    "sell": 1540
+   }
+  },
+  "3067": {
+   "name": "Gema Ardente",
+   "from": [
+    "1028",
+    "2022"
+   ],
+   "gold": {
+    "base": 150,
+    "purchasable": true,
+    "total": 800,
+    "sell": 560
+   }
+  },
+  "3075": {
+   "name": "Armadura de Espinhos",
+   "from": [
+    "3076",
+    "1031",
+    "1028"
+   ],
+   "gold": {
+    "base": 450,
+    "purchasable": true,
+    "total": 2450,
+    "sell": 1715
+   }
+  },
+  "3076": {
+   "name": "Colete Espinhoso",
+   "from": [
+    "1029",
+    "1029"
+   ],
+   "gold": {
+    "base": 200,
+    "purchasable": true,
+    "total": 800,
+    "sell": 560
+   }
+  },
+  "3109": {
+   "name": "Juramento do Cavaleiro",
+   "from": [
+    "3067",
+    "1031",
+    "1006"
+   ],
+   "gold": {
+    "base": 400,
+    "purchasable": true,
+    "total": 2300,
+    "sell": 1610
+   }
+  },
+  "3111": {
+   "name": "Passos de Mercúrio",
+   "from": [
+    "1001",
+    "1033"
+   ],
+   "gold": {
+    "base": 550,
+    "purchasable": true,
+    "total": 1250,
+    "sell": 875
+   }
+  },
+  "3113": {
+   "name": "Cintilação Etérea",
+   "from": [
+    "1052"
+   ],
+   "gold": {
+    "base": 500,
+    "purchasable": true,
+    "total": 900,
+    "sell": 630
+   }
+  },
+  "3117": {
+   "name": "Botas da Mobilidade",
+   "from": [
+    "1001"
+   ],
+   "gold": {
+    "base": 700,
+    "purchasable": false,
+    "total": 1000,
+    "sell": 700
+   }
+  },
+  "3190": {
+   "name": "Medalhão dos Solari de Ferro",
+   "from": [
+    "3067",
+    "1029",
+    "1033"
+   ],
+   "gold": {
+    "base": 700,
+    "purchasable": true,
+    "total": 2200,
+    "sell": 1540
+   }
+  },
+  "3865": {
+   "name": "Atlas Mundial",
+   "from": [],
+   "gold": {
+    "base": 400,
+    "purchasable": true,
+    "total": 400,
+    "sell": 160
+   }
+  },
+  "4642": {
+   "name": "Espelho de Bandópolis",
+   "from": [
+    "1004",
+    "1052",
+    "2022"
+   ],
+   "gold": {
+    "base": 50,
+    "purchasable": true,
+    "total": 900,
+    "sell": 630
+   }
+  }
+ }
+}

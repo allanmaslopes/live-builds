@@ -18,7 +18,7 @@ A v1 é o primeiro de uma sequência de projetos (seção 9). Ela entrega o pain
   - Seu estado: campeão, nível, barra de XP até o próximo nível, ouro atual, CS, KDA, itens.
   - **Ouro e volta à base:** o que você já pode comprar com o ouro atual, e quanto falta para o próximo componente e para o próximo item completo da build.
   - **Build recomendada da Riot para o campeão,** separada em blocos (início, core, situacional) quando a fonte trouxer blocos, com o próximo item destacado e os já comprados marcados.
-  - **Skills:** níveis atuais de Q/W/E/R e aviso de "ponto de skill disponível", com o lembrete do ultimate nos níveis 6/11/16. Só isso na v1 (decisão do usuário).
+  - **Skills:** níveis atuais de Q/W/E/R, aviso de "ponto de skill disponível" com o lembrete do ultimate nos níveis 6/11/16 e, porque a Riot publica a ordem recomendada nos dados do jogo (descoberto em 2026-11-06), a **próxima skill a evoluir** e a prioridade (ex.: "R > Q > E > W").
   - **Os 10 jogadores:** campeão, nível, KDA e **valor em itens** (soma dos preços, porque a API não dá o ouro dos outros), por time, com o total de cada time e a diferença.
   - **Confronto de rota:** você contra o oponente da mesma posição (nível e valor em itens).
 - **Desempenho medido** numa partida personalizada do usuário, com números de CPU e RAM registrados no repositório.
@@ -26,7 +26,7 @@ A v1 é o primeiro de uma sequência de projetos (seção 9). Ela entrega o pain
 ## 3. Não-objetivos da v1
 
 - Recomendação adaptativa à partida (motor próprio). Ex.: Thresh com vantagem indo de Mandato Imperial cedo; contra assassinos, Solari e Juramento do Cavaleiro. Isso é o projeto 3.
-- Ordem de skills por campeão (precisa dos dados do projeto 2).
+- Ordem de skills adaptada à partida ou vinda de elo alto (projetos 2 e 3). A ordem oficial da Riot entra na v1.
 - Overlay por cima do jogo.
 - Arena, ARAM e outros modos com regra própria (a v1 só precisa não quebrar neles; mostrar o que fizer sentido).
 - Fase de seleção de campeão (runas, feitiços).
@@ -72,7 +72,7 @@ A v1 é o primeiro de uma sequência de projetos (seção 9). Ela entrega o pain
 3. **"Comprável agora"** = itens e componentes da build recomendada (e o próximo componente do item em andamento) cujo custo restante ≤ ouro atual, usando a árvore `from`/`into` e o preço `gold.total`/`gold.base` do `item.json`, descontando componentes que você já tem.
 4. **Oponente de rota** pela `position` que a API traz. Quando vier vazia (comum em partida personalizada), usar Smite para casar os junglers e, para os demais, um seletor no próprio painel (clicar no inimigo para fixá-lo como oponente), em vez de chutar.
 5. **Gravação de "fotos" da partida** (o JSON do `allgamedata` a cada N segundos) atrás de uma flag, salva em disco local, para virar dado de teste e, mais tarde, do motor (projeto 3). Desligada por padrão.
-6. **Fonte da build da Riot:** espelho estático do Community Dragon (`raw.communitydragon.org/<patch>/plugins/rcp-be-lol-game-data/global/default/v1/champions/{id}.json` ou o caminho equivalente que o builder confirmar), sem autenticação na LCU. A LCU é só plano B.
+6. **Fonte da recomendação oficial da Riot (confirmada):** dados do jogo no Community Dragon, `raw.communitydragon.org/<patch-curto>/game/data/characters/<alias>/<alias>.bin.json`, entradas `ItemRecommendationOverrideSet` (itens de início e fases por mapa/modo) e `RecSpellRankUpInfoList` (ordem de skills por mapa/posição). O `recommendedItemDefaults` de `rcp-be-lol-game-data` vem vazio e não é usado. Sem LCU.
 7. **Aviso de skill:** usa `activePlayer.abilities.{Q,W,E,R}.abilityLevel` e `activePlayer.level` da Live Client Data; pontos disponíveis = nível − soma dos níveis das skills. Leitura a cada 1 s é suficiente para um aviso.
 8. **Instalação do Rust** portátil em `D:\Workspace\Languages-Frameworks` (padrão do workspace), pelo agente `ops-runner`.
 9. **Delegação:** Codex implementa; Gemini lê e rascunha docs; Ollama gera boilerplate; Opus planeja e revisa.

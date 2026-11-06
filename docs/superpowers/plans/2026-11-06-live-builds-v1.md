@@ -91,40 +91,44 @@
 - [ ] **Step 4:** `cargo test live` → PASS; clippy; fmt.
 - [ ] **Step 5:** Commit `feat: cliente da Live Client Data API com TLS fixado na raiz da Riot`.
 
-### Task 3: Fontes estáticas por patch (catálogo e build da Riot) com cache
+### Task 3: Fontes estáticas por patch (catálogo e recomendação oficial da Riot) com cache
 
 **Delegado:** Codex `gpt-5.6-sol`.
 
+**Fonte confirmada pelo arquiteto (2026-11-06):** o JSON de dados do jogo de cada campeão no Community Dragon, `https://raw.communitydragon.org/<patch-curto>/game/data/characters/<alias-minúsculo>/<alias-minúsculo>.bin.json` (fallback `latest`), ex.: `.../latest/game/data/characters/thresh/thresh.bin.json`. Nele:
+- entrada com `__type == "ItemRecommendationOverrideSet"` → `mOverrides[]`, cada um com `mOverrideContexts[]` (`mMapID`, `mModeNameStringId`), `StartingItemBundles[].items` e `mRecItemRanges[]` (`items`, `MaxCompletedItems` opcional). Itens vêm como `"Items/3190"`.
+- entrada com `__type == "RecSpellRankUpInfoList"` → `RecSpellRankUpInfos[]` com `MapId`, `Position` (`utility`, `top`, `jungle`, `middle`, `bottom`, `None`), `IsDefaultRecommendation`, `mDefaultPriority` (índices 0=Q, 1=W, 2=E, 3=R, em ordem de prioridade) e `mEarlyLevelOverrides` (skill a evoluir nos primeiros níveis, mesmos índices).
+
+O campo `recommendedItemDefaults` de `rcp-be-lol-game-data/.../champions/{id}.json` vem vazio: NÃO usar.
+
 **Files:**
-- Create: `src/static_data.rs`, `src/riot_build.rs`, `tests/fixtures/cdragon_champion_sample.json` (recorte real do JSON do campeão no Community Dragon com o campo de itens recomendados).
+- Create: `src/static_data.rs`, `src/riot_build.rs`, `tests/fixtures/thresh.bin.json` (recorte REAL de `D:\Workspace\live-builds-data\thresh.bin.json` contendo só as entradas `ItemRecommendationOverrideSet` e `RecSpellRankUpInfoList`).
 - Test: nos próprios módulos.
 
 **Interfaces:**
 - Consumes: `ItemCatalog::from_ddragon_json` (Task 1).
 - Produces:
   ```rust
-  pub struct BuildBlock { pub name: String, pub items: Vec<u32> }
-  pub struct RecommendedBuild { pub champion_key: u32, pub blocks: Vec<BuildBlock> } // vazio = sem build
-  pub fn parse_cdragon_recommended(json: &str, map_id: u32, mode: &str) -> RecommendedBuild;
+  pub struct ItemStage { pub items: Vec<u32>, pub max_completed: Option<u32> }
+  pub struct RecommendedBuild { pub starting: Vec<Vec<u32>>, pub stages: Vec<ItemStage> } // vazio = sem build
+  pub struct SkillOrder { pub priority: Vec<u8>, pub early: Vec<u8> }            // índices 0=Q..3=R
+  pub fn parse_riot_recommendations(bin_json: &str, map_id: u32, mode: &str, position: &str) -> (RecommendedBuild, Option<SkillOrder>);
   pub struct StaticData { pub catalog: ItemCatalog, pub catalog_patch: String, pub stale: bool }
   pub struct StaticSource { cache_dir: PathBuf, fetch: Box<dyn Fn(&str) -> Result<String, String> + Send + Sync> }
   impl StaticSource {
-      pub fn new(cache_dir: PathBuf) -> StaticSource;                       // fetch real via ureq
-      pub fn with_fetcher(cache_dir: PathBuf, f: impl Fn(&str)->Result<String,String>+Send+Sync+'static) -> StaticSource;
-      pub fn load(&self, game_version: &str) -> Result<StaticData, String>;   // patch do Data Dragon a partir da versão do jogo
-      pub fn recommended_build(&self, patch: &str, champion_key: u32, map_id: u32, mode: &str) -> RecommendedBuild;
+      pub fn new(cache_dir: PathBuf) -> StaticSource;
+      pub fn with_fetcher(cache_dir: PathBuf, f: impl Fn(&str) -> Result<String, String> + Send + Sync + 'static) -> StaticSource;
+      pub fn load(&self, game_version: &str) -> Result<StaticData, String>;
+      pub fn recommendations(&self, patch: &str, champion_alias: &str, map_id: u32, mode: &str, position: &str) -> (RecommendedBuild, Option<SkillOrder>);
   }
   ```
-  Versão do jogo `16.22.712.1234` → patch Data Dragon `16.22.1` (major.minor + `.1`; confirmar contra `versions.json` e usar a maior versão `16.22.*` listada). Mapa clássico = 11. Blocos: se a fonte trouxer blocos nomeados, usar os nomes; senão um bloco "Recomendados".
+  Versão do jogo `16.22.712.1234` → patch Data Dragon `16.22.1` (usar a maior versão `16.22.*` de `versions.json`) e patch curto do Community Dragon `16.22`. Mapa clássico = 11, modo `CLASSIC`. Escolha do override: contexto com mapa e modo iguais; senão o primeiro sem contexto. Skill order: `MapId` e `Position` iguais; senão o `IsDefaultRecommendation` do mapa; senão o de `Position == "None"`. O alias do campeão vem do `champion.json` do Data Dragon (campo `id`, ex.: `Thresh`, `MonkeyKing`), em minúsculas no caminho.
 
-- [ ] **Step 1:** Testes (todos com `with_fetcher` e diretório temporário): `maps_game_version_to_ddragon_patch`; `caches_catalog_on_disk` (segunda `load` não chama o fetcher); `falls_back_to_cached_patch_when_remote_missing` (remoto 404 para o patch novo, cache do anterior existe → `stale = true`, `catalog_patch` = anterior); `parses_recommended_blocks`; `missing_build_is_empty_not_error` (404 do Community Dragon → `blocks` vazio).
-- [ ] **Step 2:** `cargo test static_data riot_build` → FAIL.
-- [ ] **Step 3:** Implementar. Escrita no cache atômica (grava em `.tmp` e renomeia). URLs:
-  - `https://ddragon.leagueoflegends.com/api/versions.json`
-  - `https://ddragon.leagueoflegends.com/cdn/<patch>/data/pt_BR/item.json`
-  - Community Dragon: confirmar o caminho do JSON do campeão com itens recomendados (ex.: `https://raw.communitydragon.org/<patch-curto>/plugins/rcp-be-lol-game-data/global/default/v1/champions/<key>.json`, com fallback para `latest`), e registrar o caminho escolhido em comentário.
+- [ ] **Step 1:** Testes (com `with_fetcher` e `tempfile`): `maps_game_version_to_patches`; `caches_catalog_on_disk` (segunda `load` não chama o fetcher); `falls_back_to_cached_patch_when_remote_missing` (`stale = true`); `parses_thresh_classic_build` (starting `[3865, 2003, 2003]`; 1º estágio `[3190, 2065]`; algum estágio com `max_completed == Some(3)` contendo `3109`); `parses_thresh_support_skill_order` (`priority == [3,0,2,1]`, `early == [0,2,1,0]` para `utility`); `skill_order_falls_back_to_default_position`; `missing_build_is_empty_not_error` (404 → build vazia e `None`).
+- [ ] **Step 2:** `cargo test --offline static_data riot_build` → FAIL.
+- [ ] **Step 3:** Implementar. Escrita no cache atômica (`.tmp` + rename). URLs do Data Dragon: `api/versions.json`, `cdn/<patch>/data/pt_BR/item.json`, `cdn/<patch>/data/pt_BR/champion.json`.
 - [ ] **Step 4:** PASS; clippy; fmt.
-- [ ] **Step 5:** Commit `feat: catálogo e build recomendada da Riot por patch com cache em disco`.
+- [ ] **Step 5:** Commit `feat: catálogo e recomendação oficial da Riot (itens e skills) por patch com cache`.
 
 ### Task 4: Modelo do painel (`build_view`)
 
@@ -135,7 +139,7 @@
 - Test: `src/view.rs` usando os fixtures das Tasks 1–3.
 
 **Interfaces:**
-- Consumes: `GameSnapshot` (Task 2), `ItemCatalog` (Task 1), `RecommendedBuild` (Task 3).
+- Consumes: `GameSnapshot` (Task 2), `ItemCatalog` (Task 1), `RecommendedBuild` e `SkillOrder` (Task 3).
 - Produces:
   ```rust
   #[derive(Clone, PartialEq)] pub struct PanelView {
@@ -146,21 +150,22 @@
   pub struct BuildView { pub blocks: Vec<BlockView>, pub next_item: Option<NextItem>, pub affordable_now: Vec<String>, pub empty_message: Option<String> }
   pub struct BlockView { pub name: String, pub items: Vec<(String, bool /*já tem*/)> }
   pub struct NextItem { pub name: String, pub missing_gold: u32, pub next_component: Option<(String, u32 /*falta*/)> }
-  pub struct SkillView { pub q: u32, pub w: u32, pub e: u32, pub r: u32, pub points_available: u32, pub ult_hint: bool }
+  pub struct SkillView { pub q: u32, pub w: u32, pub e: u32, pub r: u32, pub points_available: u32, pub ult_hint: bool, pub next_skill: Option<char>, pub priority_label: Option<String> }
   pub struct TeamView { pub label: String, pub items_value: u32, pub players: Vec<PlayerRow> }
   pub struct PlayerRow { pub champion: String, pub level: u32, pub kda: (u32,u32,u32), pub items_value: u32, pub is_me: bool }
   pub struct LaneView { pub opponent: String, pub level_diff: i32, pub items_value_diff: i32 }
-  pub fn build_view(s: &GameSnapshot, c: &ItemCatalog, b: &RecommendedBuild, lane_pick: Option<&str>, catalog_note: Option<String>) -> PanelView;
+  pub fn build_view(s: &GameSnapshot, c: &ItemCatalog, b: &RecommendedBuild, skills: Option<&SkillOrder>, lane_pick: Option<&str>, catalog_note: Option<String>) -> PanelView;
   ```
   Regras:
-  - `next_item` = primeiro item dos blocos (na ordem, pulando o bloco de início se você já tem algum item dele) que você ainda não tem; `missing_gold = remaining_cost − ouro atual` (mín. 0); `next_component` = componente mais barato ainda não possuído desse item, com o quanto falta para ele.
+  - Blocos exibidos: "Início" (o primeiro `starting`) e um bloco por `ItemStage` ("Fase 1", "Fase 2"...; itens do mesmo estágio são alternativas). `next_item` = primeira alternativa ainda não possuída do primeiro estágio em que você não tem nenhum item completo (um estágio com `max_completed = Some(n)` só vale enquanto você tem no máximo `n` itens completos); `missing_gold = remaining_cost − ouro atual` (mín. 0); `next_component` = componente mais barato ainda não possuído desse item, com o quanto falta para ele.
   - `affordable_now` = itens da build e componentes do `next_item` com `remaining_cost ≤ ouro` e `purchasable`.
   - `points_available = level − (q+w+e+r)` (mín. 0); `ult_hint = points_available > 0 && level ∈ {6, 11, 16}`.
+  - `next_skill` (só se `points_available > 0` e houver `SkillOrder`): R se `ult_hint`; senão `early[q+w+e+r]` se existir; senão a primeira skill da `priority` (sem R) abaixo do máximo (Q/W/E máx. 5 e no máximo `ceil(level/2)`). `priority_label` = "R > Q > E > W" a partir de `priority`.
   - `items_value` = soma de `total_cost` dos itens; times ordenados com o seu time primeiro.
   - `xp_fraction`: `None` se a API não der XP (não inventar).
   - `lane`: pela `position` igual; se vazia, `lane_pick`; se o jogador tiver Smite, o inimigo com Smite; senão `None`.
 
-- [ ] **Step 1:** Testes: `next_item_skips_owned_and_starter`; `missing_gold_and_next_component`; `affordable_now_respects_gold`; `skill_points_and_ult_hint` (nível 6 com Q2 W1 E2 R0 → 1 ponto, `ult_hint`); `team_values_and_my_team_first`; `lane_by_position_then_pick_then_smite`; `view_tolerates_unknown_items`; `view_handles_arena_snapshot` (mais de 2 times, sem pânico, `lane = None`); `empty_build_shows_message`; `same_snapshot_gives_equal_view` (duas chamadas → `==`, base da detecção de mudança).
+- [ ] **Step 1:** Testes: `next_skill_follows_riot_order` (Thresh `priority [3,0,2,1]`, `early [0,2,1,0]`: nível 1 sem pontos → Q; nível 2 com Q1 → E; nível 6 com 5 pontos usados → R; nível 7 com R1 → Q); `next_item_skips_owned_and_starter`; `missing_gold_and_next_component`; `affordable_now_respects_gold`; `skill_points_and_ult_hint` (nível 6 com Q2 W1 E2 R0 → 1 ponto, `ult_hint`); `team_values_and_my_team_first`; `lane_by_position_then_pick_then_smite`; `view_tolerates_unknown_items`; `view_handles_arena_snapshot` (mais de 2 times, sem pânico, `lane = None`); `empty_build_shows_message`; `same_snapshot_gives_equal_view` (duas chamadas → `==`, base da detecção de mudança).
 - [ ] **Step 2:** `cargo test view` → FAIL.
 - [ ] **Step 3:** Implementar como funções puras, sem I/O.
 - [ ] **Step 4:** PASS; clippy; fmt.

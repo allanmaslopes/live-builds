@@ -1,3 +1,3 @@
-fn main() {
-    println!("live-builds {}", env!("CARGO_PKG_VERSION"));
+fn main() -> eframe::Result {
+    live_builds::run()
 }

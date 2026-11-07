@@ -4,12 +4,18 @@ use std::error::Error;
 use std::fmt;
 use std::num::ParseIntError;
 
+pub const BOOTS: u32 = 1001;
+/// Botas Levemente Mágicas, dadas pela runa Calçados Mágicos.
+pub const MAGICAL_FOOTWEAR: u32 = 2422;
+pub const MAGICAL_FOOTWEAR_RUNE: u32 = 8304;
+
 pub struct Item {
     pub id: u32,
     pub name: String,
     pub total_cost: u32,
     pub base_cost: u32,
     pub from: Vec<u32>,
+    pub into: Vec<u32>,
     pub purchasable: bool,
 }
 
@@ -64,6 +70,12 @@ impl ItemCatalog {
                 .map(|component| parse_item_id(component))
                 .collect::<Result<Vec<_>, _>>()?;
 
+            let into = raw_item
+                .into
+                .iter()
+                .map(|result| parse_item_id(result))
+                .collect::<Result<Vec<_>, _>>()?;
+
             items.insert(
                 id,
                 Item {
@@ -72,6 +84,7 @@ impl ItemCatalog {
                     total_cost: raw_item.gold.total,
                     base_cost: raw_item.gold.base,
                     from,
+                    into,
                     purchasable: raw_item.gold.purchasable,
                 },
             );
@@ -116,6 +129,58 @@ impl ItemCatalog {
         false
     }
 
+    /// Qualquer bota: Botas, Levemente Mágicas, itens feitos de uma delas e suas evoluções gratuitas.
+    pub fn is_boots(&self, id: u32) -> bool {
+        let mut current = id;
+        let mut visited = HashSet::new();
+        while visited.insert(current) {
+            if current == BOOTS || current == MAGICAL_FOOTWEAR {
+                return true;
+            }
+            match self.get(current) {
+                Some(item)
+                    if item.from.contains(&BOOTS) || item.from.contains(&MAGICAL_FOOTWEAR) =>
+                {
+                    return true;
+                }
+                Some(item) if item.from.len() == 1 && item.base_cost == 0 => current = item.from[0],
+                _ => return false,
+            }
+        }
+        false
+    }
+
+    /// As Levemente Mágicas pagam o componente Botas de qualquer bota de nível 2.
+    pub fn magical_footwear_for(&self, component: u32, parent: u32) -> Option<u32> {
+        (component == BOOTS
+            && self
+                .get(MAGICAL_FOOTWEAR)
+                .is_some_and(|magical| magical.into.contains(&parent)))
+        .then_some(MAGICAL_FOOTWEAR)
+    }
+
+    /// Consome de `left` quem cobre `component` na receita de `parent`.
+    pub fn take_component(
+        &self,
+        left: &mut HashMap<u32, u32>,
+        component: u32,
+        parent: u32,
+    ) -> bool {
+        [
+            Some(component),
+            self.magical_footwear_for(component, parent),
+        ]
+        .into_iter()
+        .flatten()
+        .any(|id| match left.get_mut(&id) {
+            Some(n) if *n > 0 => {
+                *n -= 1;
+                true
+            }
+            _ => false,
+        })
+    }
+
     pub fn remaining_cost(&self, target: u32, owned: &[u32]) -> u32 {
         let Some(target_item) = self.get(target) else {
             return 0;
@@ -131,7 +196,12 @@ impl ItemCatalog {
 
         let mut path = HashSet::from([target]);
         let discount = target_item.from.iter().fold(0_u32, |total, &component| {
-            total.saturating_add(self.component_discount(component, &mut available, &mut path))
+            total.saturating_add(self.component_discount(
+                component,
+                target,
+                &mut available,
+                &mut path,
+            ))
         });
 
         target_item.total_cost.saturating_sub(discount)
@@ -140,14 +210,20 @@ impl ItemCatalog {
     fn component_discount(
         &self,
         id: u32,
+        parent: u32,
         available: &mut HashMap<u32, usize>,
         path: &mut HashSet<u32>,
     ) -> u32 {
-        if let Some(count) = available.get_mut(&id)
-            && *count > 0
+        for owned in [Some(id), self.magical_footwear_for(id, parent)]
+            .into_iter()
+            .flatten()
         {
-            *count -= 1;
-            return self.get(id).map_or(0, |item| item.total_cost);
+            if let Some(count) = available.get_mut(&owned)
+                && *count > 0
+            {
+                *count -= 1;
+                return self.get(owned).map_or(0, |item| item.total_cost);
+            }
         }
 
         let Some(item) = self.get(id) else {
@@ -158,7 +234,7 @@ impl ItemCatalog {
         }
 
         let discount = item.from.iter().fold(0_u32, |total, &component| {
-            total.saturating_add(self.component_discount(component, available, path))
+            total.saturating_add(self.component_discount(component, id, available, path))
         });
         path.remove(&id);
         discount
@@ -176,6 +252,8 @@ struct DDragonItem {
     gold: DDragonGold,
     #[serde(default)]
     from: Vec<String>,
+    #[serde(default)]
+    into: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -288,5 +366,40 @@ mod tests {
         assert!(!catalog.owns(3172, &[3006]));
         assert!(!catalog.owns(3006, &[1001]));
         assert!(!catalog.owns(3047, &[3172]));
+    }
+
+    #[test]
+    fn magical_boots_replace_boots_in_recipe() {
+        let catalog = ItemCatalog::from_ddragon_json(
+            "16.22.1",
+            include_str!("../tests/fixtures/item_thresh.json"),
+        )
+        .expect("fixture should contain a valid Data Dragon item catalog");
+        let expected = catalog.get(3006).unwrap().total_cost - 300;
+
+        assert_eq!(catalog.remaining_cost(3006, &[2422]), expected);
+        assert_eq!(catalog.remaining_cost(3006, &[1001]), expected);
+        // 2422 não "é" 1001: não marca bloco de botas.
+        assert!(!catalog.owns(1001, &[2422]));
+        // cada 2422 cobre uma 1001; só vale para quem está em `2422.into`
+        assert_eq!(catalog.remaining_cost(3006, &[2422, 2422]), expected);
+        let outside = catalog.get(3010).unwrap().total_cost;
+        assert_eq!(catalog.remaining_cost(3010, &[2422]), outside);
+    }
+
+    #[test]
+    fn is_boots_recognizes_any_boots() {
+        let catalog = ItemCatalog::from_ddragon_json(
+            "16.22.1",
+            include_str!("../tests/fixtures/item_thresh.json"),
+        )
+        .unwrap();
+
+        for id in [1001, 2422, 3005, 3006, 3010, 3172] {
+            assert!(catalog.is_boots(id), "{id}");
+        }
+        for id in [3190, 1042, 999_999] {
+            assert!(!catalog.is_boots(id), "{id}");
+        }
     }
 }

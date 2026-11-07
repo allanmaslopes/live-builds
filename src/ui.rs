@@ -150,6 +150,9 @@ fn build(ui: &mut egui::Ui, build: &BuildView, gold: u32) {
             ui.label(format!("Próximo componente: {name} ({cost})"));
         }
     }
+    if let Some(line) = &build.free_boots_line {
+        ui.label(line);
+    }
     if !build.affordable_now.is_empty() {
         ui.label(format!(
             "Dá para comprar já: {}",

@@ -1,4 +1,4 @@
-use crate::catalog::ItemCatalog;
+use crate::catalog::{BOOTS, ItemCatalog, MAGICAL_FOOTWEAR, MAGICAL_FOOTWEAR_RUNE};
 use crate::live::{GameSnapshot, PlayerInfo};
 use crate::riot_build::{RecommendedBuild, SkillOrder};
 use std::collections::HashMap;
@@ -36,6 +36,7 @@ pub struct BuildView {
     pub next_item: Option<NextItem>,
     pub affordable_now: Vec<String>,
     pub empty_message: Option<String>,
+    pub free_boots_line: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -113,7 +114,7 @@ pub fn build_view(
 
     PanelView {
         me,
-        build: build_section(c, b, owned, gold),
+        build: build_section(c, b, owned, gold, &s.active.rune_ids),
         skills: skill_section(s, skills),
         teams: team_section(s, c, me_info),
         lane: me_info.and_then(|me| lane_section(s, c, me, lane_pick)),
@@ -132,7 +133,27 @@ fn items_value(c: &ItemCatalog, items: &[u32]) -> u32 {
         .sum()
 }
 
-fn build_section(c: &ItemCatalog, b: &RecommendedBuild, owned: &[u32], gold: u32) -> BuildView {
+fn build_section(
+    c: &ItemCatalog,
+    b: &RecommendedBuild,
+    owned: &[u32],
+    gold: u32,
+    runes: &[u32],
+) -> BuildView {
+    // Calçados Mágicos dá as Levemente Mágicas: sem bota ainda, 1001 não é compra.
+    let free_boots = runes.contains(&MAGICAL_FOOTWEAR_RUNE)
+        && c.get(MAGICAL_FOOTWEAR).is_some()
+        && !owned.iter().any(|&id| c.is_boots(id));
+    // 1001 como item do bloco; como componente, só some se o pai está em `2422.into`.
+    let hidden = |id: u32| free_boots && id == BOOTS;
+    // Para custos, as botas grátis já contam como possuídas.
+    let cost_owned: Vec<u32> = owned
+        .iter()
+        .copied()
+        .chain(free_boots.then_some(MAGICAL_FOOTWEAR))
+        .collect();
+    let owned_cost = cost_owned.as_slice();
+
     // Cada item do inventário cobre uma ocorrência no bloco.
     let block = |name: String, ids: &[u32]| {
         let mut left = owned.to_vec();
@@ -179,7 +200,7 @@ fn build_section(c: &ItemCatalog, b: &RecommendedBuild, owned: &[u32], gold: u32
             st.items
                 .iter()
                 .copied()
-                .find(|&id| !c.owns(id, owned) && c.get(id).is_some())
+                .find(|&id| !hidden(id) && !c.owns(id, owned) && c.get(id).is_some())
         });
 
     let mut affordable_ids: Vec<u32> = b
@@ -188,16 +209,16 @@ fn build_section(c: &ItemCatalog, b: &RecommendedBuild, owned: &[u32], gold: u32
         .into_iter()
         .flatten()
         .chain(b.stages.iter().flat_map(|st| st.items.iter()))
-        .filter(|&&id| !c.owns(id, owned))
+        .filter(|&&id| !c.owns(id, owned) && !hidden(id))
         .copied()
         .collect();
     let next_item = next_id.and_then(|id| {
         let item = c.get(id)?;
-        let mut left = owned_counts(owned);
+        let mut left = owned_counts(owned_cost);
         let next_component = item
             .from
             .iter()
-            .filter(|&&comp| !take_owned(&mut left, comp))
+            .filter(|&&comp| !c.take_component(&mut left, comp, id))
             .filter_map(|&comp| c.get(comp))
             .min_by_key(|comp| (comp.total_cost, comp.id));
         let remaining_owned: Vec<_> = left
@@ -210,10 +231,15 @@ fn build_section(c: &ItemCatalog, b: &RecommendedBuild, owned: &[u32], gold: u32
                 .saturating_sub(gold);
             (comp.name.clone(), missing)
         });
-        affordable_ids.extend(item.from.iter().copied());
+        affordable_ids.extend(
+            item.from
+                .iter()
+                .copied()
+                .filter(|&comp| !(free_boots && c.magical_footwear_for(comp, item.id).is_some())),
+        );
         Some(NextItem {
             name: item.name.clone(),
-            missing_gold: c.remaining_cost(id, owned).saturating_sub(gold),
+            missing_gold: c.remaining_cost(id, owned_cost).saturating_sub(gold),
             next_component,
         })
     });
@@ -223,7 +249,7 @@ fn build_section(c: &ItemCatalog, b: &RecommendedBuild, owned: &[u32], gold: u32
         let Some(item) = c.get(id) else { continue };
         if item.purchasable
             && !owned.contains(&id)
-            && c.remaining_cost(id, owned) <= gold
+            && c.remaining_cost(id, owned_cost) <= gold
             && !affordable_now.contains(&item.name)
         {
             affordable_now.push(item.name.clone());
@@ -236,6 +262,7 @@ fn build_section(c: &ItemCatalog, b: &RecommendedBuild, owned: &[u32], gold: u32
         next_item,
         affordable_now,
         empty_message: empty.then(|| "Sem build recomendada da Riot para este campeão".to_owned()),
+        free_boots_line: free_boots.then(|| "Botas grátis pela runa (Calçados Mágicos)".to_owned()),
     }
 }
 
@@ -245,17 +272,6 @@ fn owned_counts(owned: &[u32]) -> HashMap<u32, u32> {
         *counts.entry(id).or_insert(0) += 1;
     }
     counts
-}
-
-/// Consome uma unidade possuída de `id`; `true` se o jogador tinha.
-fn take_owned(left: &mut HashMap<u32, u32>, id: u32) -> bool {
-    match left.get_mut(&id) {
-        Some(n) if *n > 0 => {
-            *n -= 1;
-            true
-        }
-        _ => false,
-    }
 }
 
 fn skill_section(s: &GameSnapshot, order: Option<&SkillOrder>) -> SkillView {
@@ -828,5 +844,96 @@ mod tests {
         let a = build_view(&s, &c, &build, Some(&skills), Some("Jinx"), None);
         let b = build_view(&s, &c, &build, Some(&skills), Some("Jinx"), None);
         assert_eq!(a, b);
+    }
+
+    fn with_magical_footwear_rune(s: &mut GameSnapshot) {
+        s.active.rune_ids = vec![8304];
+    }
+
+    #[test]
+    fn magical_footwear_hides_boots_purchase() {
+        let (c, mut s) = (catalog(), classic());
+        let build = RecommendedBuild {
+            starting: vec![],
+            stages: vec![
+                ItemStage {
+                    items: vec![1001],
+                    max_completed: None,
+                },
+                ItemStage {
+                    items: vec![3006],
+                    max_completed: None,
+                },
+            ],
+        };
+        set_items(&mut s, 5000.0, &[]);
+        with_magical_footwear_rune(&mut s);
+
+        let v = build_view(&s, &c, &build, None, None, None).build;
+
+        let boots = c.name(1001);
+        let n = v.next_item.unwrap();
+        assert_eq!(n.name, c.name(3006));
+        assert_ne!(n.next_component.unwrap().0, boots);
+        assert!(!v.affordable_now.contains(&boots));
+        assert!(v.free_boots_line.is_some());
+
+        // sem a runa, a sugestão de Botas continua
+        s.active.rune_ids.clear();
+        let v = build_view(&s, &c, &build, None, None, None).build;
+        assert_eq!(v.next_item.unwrap().name, c.name(1001));
+        assert!(v.free_boots_line.is_none());
+
+        // já tenho bota: a linha some
+        with_magical_footwear_rune(&mut s);
+        set_items(&mut s, 5000.0, &[2422]);
+        assert!(
+            build_view(&s, &c, &build, None, None, None)
+                .build
+                .free_boots_line
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn magical_boots_next_component_is_not_boots() {
+        let (c, mut s) = (catalog(), classic());
+        let build = RecommendedBuild {
+            starting: vec![],
+            stages: vec![ItemStage {
+                items: vec![3006],
+                max_completed: None,
+            }],
+        };
+        set_items(&mut s, 0.0, &[2422]);
+
+        let n = build_view(&s, &c, &build, None, None, None)
+            .build
+            .next_item
+            .unwrap();
+
+        assert_eq!(n.missing_gold, c.get(3006).unwrap().total_cost - 300);
+        assert_ne!(n.next_component.unwrap().0, c.name(1001));
+    }
+
+    #[test]
+    fn boots_still_suggested_for_target_outside_magical_into() {
+        let (c, mut s) = (catalog(), classic());
+        let build = RecommendedBuild {
+            starting: vec![],
+            stages: vec![ItemStage {
+                items: vec![3010],
+                max_completed: None,
+            }],
+        };
+        set_items(&mut s, 5000.0, &[]);
+        with_magical_footwear_rune(&mut s);
+
+        let v = build_view(&s, &c, &build, None, None, None).build;
+
+        let n = v.next_item.unwrap();
+        assert_eq!(n.name, c.name(3010));
+        assert_eq!(n.next_component.unwrap().0, c.name(1001));
+        assert!(v.affordable_now.contains(&c.name(1001)));
     }
 }

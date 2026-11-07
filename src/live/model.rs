@@ -16,6 +16,7 @@ pub struct ActivePlayer {
     pub level: u32,
     pub current_gold: f64,
     pub abilities: AbilityLevels,
+    pub rune_ids: Vec<u32>,
 }
 
 #[derive(Debug)]
@@ -113,6 +114,12 @@ pub fn parse_all_game_data(json: &str) -> Result<GameSnapshot, LiveError> {
             e: ability_level("E"),
             r: ability_level("R"),
         },
+        rune_ids: active["fullRunes"]["generalRunes"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|rune| integer(&rune["id"]))
+            .collect(),
     };
 
     Ok(GameSnapshot {
@@ -198,6 +205,22 @@ mod tests {
         assert!(snapshot.players[6].has_smite);
         assert_eq!(snapshot.raw["gameData"]["mapNumber"], 11);
         assert!(snapshot.raw["_fixture_note"].is_string());
+    }
+
+    #[test]
+    fn parses_active_rune_ids() {
+        let with =
+            r#"{"activePlayer":{"summonerName":"A","fullRunes":{"generalRunes":[{"id":8304}]}}}"#;
+        let without = r#"{"activePlayer":{"summonerName":"A"}}"#;
+
+        assert_eq!(parse_all_game_data(with).unwrap().active.rune_ids, [8304]);
+        assert!(
+            parse_all_game_data(without)
+                .unwrap()
+                .active
+                .rune_ids
+                .is_empty()
+        );
     }
 
     #[test]

@@ -157,6 +157,38 @@
     "sell": 1540
    }
   },
+  "2422": {
+   "name": "Botas Levemente Mágicas",
+   "from": [],
+   "into": [
+    "3006",
+    "3047",
+    "3020",
+    "3158",
+    "3111",
+    "3117",
+    "3009",
+    "3008"
+   ],
+   "gold": {
+    "base": 300,
+    "purchasable": false,
+    "total": 300,
+    "sell": 90
+   }
+  },
+  "3005": {
+   "name": "Ghostcrawlers",
+   "from": [
+    "1001"
+   ],
+   "gold": {
+    "base": 700,
+    "purchasable": true,
+    "total": 1000,
+    "sell": 700
+   }
+  },
   "3006": {
    "name": "Grevas do Berserker",
    "from": [

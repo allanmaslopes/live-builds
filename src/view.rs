@@ -133,12 +133,26 @@ fn items_value(c: &ItemCatalog, items: &[u32]) -> u32 {
 }
 
 fn build_section(c: &ItemCatalog, b: &RecommendedBuild, owned: &[u32], gold: u32) -> BuildView {
-    let block = |name: String, ids: &[u32]| BlockView {
-        name,
-        items: ids
-            .iter()
-            .map(|&id| (c.name(id), owned.contains(&id)))
-            .collect(),
+    // Cada item do inventário cobre uma ocorrência no bloco.
+    let block = |name: String, ids: &[u32]| {
+        let mut left = owned.to_vec();
+        BlockView {
+            name,
+            items: ids
+                .iter()
+                .map(|&id| {
+                    // ID exato antes de evolução: [3172, 3006] cobre o bloco [3006, 3172] inteiro.
+                    let hit = left
+                        .iter()
+                        .position(|&o| o == id)
+                        .or_else(|| left.iter().position(|&o| c.is_or_evolves_from(o, id)));
+                    if let Some(i) = hit {
+                        left.swap_remove(i);
+                    }
+                    (c.name(id), hit.is_some())
+                })
+                .collect(),
+        }
     };
     let mut blocks = Vec::new();
     if let Some(start) = b.starting.first() {
@@ -160,8 +174,13 @@ fn build_section(c: &ItemCatalog, b: &RecommendedBuild, owned: &[u32], gold: u32
         .stages
         .iter()
         .filter(|st| st.max_completed.is_none_or(|n| completed <= n))
-        .filter(|st| !st.items.iter().any(|id| owned.contains(id)))
-        .find_map(|st| st.items.iter().copied().find(|&id| c.get(id).is_some()));
+        .filter(|st| !st.items.iter().any(|&id| c.owns(id, owned)))
+        .find_map(|st| {
+            st.items
+                .iter()
+                .copied()
+                .find(|&id| !c.owns(id, owned) && c.get(id).is_some())
+        });
 
     let mut affordable_ids: Vec<u32> = b
         .starting
@@ -169,6 +188,7 @@ fn build_section(c: &ItemCatalog, b: &RecommendedBuild, owned: &[u32], gold: u32
         .into_iter()
         .flatten()
         .chain(b.stages.iter().flat_map(|st| st.items.iter()))
+        .filter(|&&id| !c.owns(id, owned))
         .copied()
         .collect();
     let next_item = next_id.and_then(|id| {
@@ -179,11 +199,17 @@ fn build_section(c: &ItemCatalog, b: &RecommendedBuild, owned: &[u32], gold: u32
             .iter()
             .filter(|&&comp| !take_owned(&mut left, comp))
             .filter_map(|&comp| c.get(comp))
-            .min_by_key(|comp| (comp.total_cost, comp.id))
-            .map(|comp| {
-                let missing = c.remaining_cost(comp.id, owned).saturating_sub(gold);
-                (comp.name.clone(), missing)
-            });
+            .min_by_key(|comp| (comp.total_cost, comp.id));
+        let remaining_owned: Vec<_> = left
+            .into_iter()
+            .flat_map(|(id, count)| std::iter::repeat_n(id, count as usize))
+            .collect();
+        let next_component = next_component.map(|comp| {
+            let missing = c
+                .remaining_cost(comp.id, &remaining_owned)
+                .saturating_sub(gold);
+            (comp.name.clone(), missing)
+        });
         affordable_ids.extend(item.from.iter().copied());
         Some(NextItem {
             name: item.name.clone(),
@@ -459,6 +485,66 @@ mod tests {
     }
 
     #[test]
+    fn upgraded_boots_mark_boots_stage_done() {
+        let (c, mut s) = (catalog(), classic());
+        let build = RecommendedBuild {
+            starting: vec![vec![1001, 1042]],
+            stages: vec![ItemStage {
+                items: vec![3006, 3047],
+                max_completed: None,
+            }],
+        };
+        set_items(&mut s, 5000.0, &[3172]);
+
+        let v = build_view(&s, &c, &build, None, None, None).build;
+
+        assert_eq!(
+            v.blocks[0].items,
+            vec![(c.name(1001), false), (c.name(1042), false)]
+        );
+        assert_eq!(
+            v.blocks[1].items,
+            vec![(c.name(3006), true), (c.name(3047), false)]
+        );
+        assert!(v.next_item.is_none());
+        assert!(v.affordable_now.contains(&c.name(1001)));
+        assert!(v.affordable_now.contains(&c.name(1042)));
+        assert!(!v.affordable_now.contains(&c.name(3006)));
+    }
+
+    #[test]
+    fn boots_bought_early_do_not_stay_as_next_item() {
+        let (c, mut s) = (catalog(), classic());
+        let build = RecommendedBuild {
+            starting: vec![],
+            stages: vec![
+                ItemStage {
+                    items: vec![3031],
+                    max_completed: Some(0),
+                },
+                ItemStage {
+                    items: vec![3006],
+                    max_completed: None,
+                },
+                ItemStage {
+                    items: vec![3190],
+                    max_completed: None,
+                },
+            ],
+        };
+        set_items(&mut s, 5000.0, &[3172]);
+        let early = build_view(&s, &c, &build, None, None, None).build;
+        assert_eq!(early.next_item.unwrap().name, c.name(3031));
+        assert!(early.blocks[1].items[0].1);
+
+        set_items(&mut s, 5000.0, &[3172, 3031]);
+        let later = build_view(&s, &c, &build, None, None, None).build;
+        assert_eq!(later.next_item.unwrap().name, c.name(3190));
+        assert!(later.blocks[1].items[0].1);
+        assert!(!later.affordable_now.contains(&c.name(3006)));
+    }
+
+    #[test]
     fn missing_gold_and_next_component() {
         let (build, _) = thresh();
         let (c, mut s) = (catalog(), classic());
@@ -488,6 +574,98 @@ mod tests {
             .next_item
             .unwrap();
         assert_eq!(n.missing_gold, 0);
+    }
+
+    #[test]
+    fn incorporated_components_do_not_count_as_owned_items() {
+        let (c, mut s) = (catalog(), classic());
+        let build = RecommendedBuild {
+            starting: vec![],
+            stages: vec![ItemStage {
+                items: vec![3076],
+                max_completed: None,
+            }],
+        };
+        set_items(&mut s, 300.0, &[1031]);
+        let view = build_view(&s, &c, &build, None, None, None);
+        assert!(view.build.affordable_now.contains(&c.name(1029)));
+        let next = view.build.next_item.unwrap();
+        assert_eq!(next.next_component, Some((c.name(1029), 0)));
+        assert_eq!(next.missing_gold, 500);
+
+        set_items(&mut s, 0.0, &[1031, 1029]);
+
+        let next = build_view(&s, &c, &build, None, None, None)
+            .build
+            .next_item
+            .unwrap();
+
+        assert_eq!(next.next_component, Some((c.name(1029), 300)));
+    }
+
+    #[test]
+    fn consumed_component_is_not_owned() {
+        let (c, mut s) = (catalog(), classic());
+        let build = RecommendedBuild {
+            starting: vec![vec![1018]],
+            stages: vec![],
+        };
+        set_items(&mut s, 600.0, &[3031]);
+
+        let view = build_view(&s, &c, &build, None, None, None).build;
+
+        assert_eq!(view.blocks[0].items, vec![(c.name(1018), false)]);
+        assert!(view.affordable_now.contains(&c.name(1018)));
+    }
+
+    #[test]
+    fn one_owned_item_covers_one_occurrence() {
+        let (c, mut s) = (catalog(), classic());
+        let build = RecommendedBuild {
+            starting: vec![],
+            stages: vec![ItemStage {
+                items: vec![3006, 3006],
+                max_completed: None,
+            }],
+        };
+        set_items(&mut s, 0.0, &[3172]);
+
+        let view = build_view(&s, &c, &build, None, None, None).build;
+
+        assert_eq!(
+            view.blocks[0].items,
+            vec![(c.name(3006), true), (c.name(3006), false)]
+        );
+    }
+
+    #[test]
+    fn exact_match_before_evolution_in_block() {
+        let (c, mut s) = (catalog(), classic());
+        let build = RecommendedBuild {
+            starting: vec![],
+            stages: vec![ItemStage {
+                items: vec![3006, 3172],
+                max_completed: None,
+            }],
+        };
+        set_items(&mut s, 0.0, &[3172, 3006]);
+
+        let view = build_view(&s, &c, &build, None, None, None).build;
+
+        assert_eq!(
+            view.blocks[0].items,
+            vec![(c.name(3006), true), (c.name(3172), true)]
+        );
+    }
+
+    #[test]
+    fn owned_counts_preserves_exact_item_multiplicity() {
+        let counts = owned_counts(&[3172, 3172]);
+
+        assert_eq!(counts.get(&3172), Some(&2));
+        assert!(!counts.contains_key(&3006));
+        assert!(!counts.contains_key(&1001));
+        assert!(!counts.contains_key(&1042));
     }
 
     #[test]
@@ -527,7 +705,7 @@ mod tests {
         assert_eq!(v.teams[0].players[0].items_value, 350); // 3850 desconhecido + 300 + 50
         assert_eq!(
             (v.teams[0].items_value, v.teams[1].items_value),
-            (650, 1400)
+            (650, 1650)
         );
 
         // meu time passa a ser o CHAOS: ele vem primeiro

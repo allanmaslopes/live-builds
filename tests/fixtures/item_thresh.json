@@ -32,6 +32,16 @@
     "sell": 120
    }
   },
+  "1018": {
+   "name": "Capa da Agilidade",
+   "from": [],
+   "gold": {
+    "base": 600,
+    "purchasable": true,
+    "total": 600,
+    "sell": 420
+   }
+  },
   "1028": {
    "name": "Cristal de Rubi",
    "from": [],
@@ -72,6 +82,36 @@
     "purchasable": true,
     "total": 400,
     "sell": 280
+   }
+  },
+  "1037": {
+   "name": "Picareta",
+   "from": [],
+   "gold": {
+    "base": 875,
+    "purchasable": true,
+    "total": 875,
+    "sell": 613
+   }
+  },
+  "1038": {
+   "name": "Espada G. p. C.",
+   "from": [],
+   "gold": {
+    "base": 1300,
+    "purchasable": true,
+    "total": 1300,
+    "sell": 910
+   }
+  },
+  "1042": {
+   "name": "Adaga",
+   "from": [],
+   "gold": {
+    "base": 250,
+    "purchasable": true,
+    "total": 250,
+    "sell": 175
    }
   },
   "1052": {
@@ -115,6 +155,58 @@
     "purchasable": true,
     "total": 2200,
     "sell": 1540
+   }
+  },
+  "3006": {
+   "name": "Grevas do Berserker",
+   "from": [
+    "1001",
+    "1042",
+    "1042"
+   ],
+   "gold": {
+    "base": 300,
+    "purchasable": true,
+    "total": 1100,
+    "sell": 770
+   }
+  },
+  "3010": {
+   "name": "Solas Simbióticas",
+   "from": [
+    "1001"
+   ],
+   "gold": {
+    "base": 600,
+    "purchasable": false,
+    "total": 900,
+    "sell": 630
+   }
+  },
+  "3013": {
+   "name": "Almas Sincronizadas",
+   "from": [
+    "3010"
+   ],
+   "gold": {
+    "base": 0,
+    "purchasable": false,
+    "total": 900,
+    "sell": 630
+   }
+  },
+  "3031": {
+   "name": "Gume do Infinito",
+   "from": [
+    "1038",
+    "1037",
+    "1018"
+   ],
+   "gold": {
+    "base": 725,
+    "purchasable": true,
+    "total": 3500,
+    "sell": 2450
    }
   },
   "3047": {
@@ -233,6 +325,30 @@
     "purchasable": false,
     "total": 1000,
     "sell": 700
+   }
+  },
+  "3172": {
+   "name": "Grevas Bélicas",
+   "from": [
+    "3006"
+   ],
+   "gold": {
+    "base": 0,
+    "purchasable": true,
+    "total": 1100,
+    "sell": 770
+   }
+  },
+  "3176": {
+   "name": "Sempre Avante",
+   "from": [
+    "3013"
+   ],
+   "gold": {
+    "base": 0,
+    "purchasable": false,
+    "total": 900,
+    "sell": 630
    }
   },
   "3190": {

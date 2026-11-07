@@ -93,6 +93,29 @@ impl ItemCatalog {
             .map_or_else(|| format!("Item {id}"), |item| item.name.clone())
     }
 
+    /// `owned` contém `target` ou uma evolução gratuita dele (ex.: 3172 conta como 3006).
+    /// Componentes consumidos numa receita não contam: viraram outro item.
+    pub fn owns(&self, target: u32, owned: &[u32]) -> bool {
+        owned.iter().any(|&id| self.is_or_evolves_from(id, target))
+    }
+
+    /// `id == target`, ou `id` vem de `target` só por evoluções gratuitas
+    /// (receita de um único componente e `base_cost == 0`), em qualquer profundidade.
+    pub fn is_or_evolves_from(&self, id: u32, target: u32) -> bool {
+        let mut current = id;
+        let mut visited = HashSet::new();
+        while visited.insert(current) {
+            if current == target {
+                return true;
+            }
+            match self.get(current) {
+                Some(item) if item.from.len() == 1 && item.base_cost == 0 => current = item.from[0],
+                _ => return false,
+            }
+        }
+        false
+    }
+
     pub fn remaining_cost(&self, target: u32, owned: &[u32]) -> u32 {
         let Some(target_item) = self.get(target) else {
             return 0;
@@ -217,5 +240,53 @@ mod tests {
     #[test]
     fn remaining_cost_of_owned_item_is_zero() {
         assert_eq!(catalog().remaining_cost(3071, &[3071]), 0);
+    }
+
+    #[test]
+    fn owns_through_upgrade() {
+        let catalog = ItemCatalog::from_ddragon_json(
+            "16.22.1",
+            include_str!("../tests/fixtures/item_thresh.json"),
+        )
+        .expect("fixture should contain a valid Data Dragon item catalog");
+
+        assert!(catalog.owns(3172, &[3172]));
+        assert!(catalog.owns(3006, &[3172]));
+    }
+
+    #[test]
+    fn owns_through_evolution_chain() {
+        let catalog = ItemCatalog::from_ddragon_json(
+            "16.22.1",
+            include_str!("../tests/fixtures/item_thresh.json"),
+        )
+        .expect("fixture should contain a valid Data Dragon item catalog");
+
+        assert!(catalog.owns(3010, &[3176]));
+    }
+
+    #[test]
+    fn component_inside_owned_item_is_not_owned() {
+        let catalog = ItemCatalog::from_ddragon_json(
+            "16.22.1",
+            include_str!("../tests/fixtures/item_thresh.json"),
+        )
+        .expect("fixture should contain a valid Data Dragon item catalog");
+
+        assert!(!catalog.owns(1001, &[3006]));
+        assert!(!catalog.owns(1018, &[3031]));
+    }
+
+    #[test]
+    fn upgrade_is_not_owned_by_base() {
+        let catalog = ItemCatalog::from_ddragon_json(
+            "16.22.1",
+            include_str!("../tests/fixtures/item_thresh.json"),
+        )
+        .expect("fixture should contain a valid Data Dragon item catalog");
+
+        assert!(!catalog.owns(3172, &[3006]));
+        assert!(!catalog.owns(3006, &[1001]));
+        assert!(!catalog.owns(3047, &[3172]));
     }
 }

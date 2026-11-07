@@ -1,7 +1,10 @@
+use crate::knowledge::KnowledgeSource;
 use crate::live::LiveClient;
 use crate::poller::{PanelState, PollConfig, Poller};
 use crate::static_data::StaticSource;
-use crate::view::{BuildView, LaneView, MeView, PanelView, SkillView, TeamView};
+use crate::view::{
+    BuildView, HighEloSection, HighEloView, LaneView, MeView, PanelView, SkillView, TeamView,
+};
 use egui::{Color32, RichText};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -35,7 +38,8 @@ impl App {
         // Repaint only when the poller reports a new state; egui is idle otherwise.
         let poller = Poller::spawn(
             Box::new(LiveClient::new()),
-            StaticSource::new(cache_dir),
+            StaticSource::new(cache_dir.clone()),
+            KnowledgeSource::new(cfg.knowledge_url.clone(), cache_dir),
             move |new| {
                 if let Ok(mut guard) = shared.lock() {
                     *guard = new;
@@ -77,6 +81,7 @@ fn centered(ctx: &egui::Context, text: RichText) {
 impl App {
     /// Draws layout B; returns the enemy champion the user clicked, if any.
     fn panel(&self, ctx: &egui::Context, view: &PanelView) -> Option<String> {
+        egui::TopBottomPanel::top("high_elo").show(ctx, |ui| high_elo(ui, &view.high_elo));
         egui::TopBottomPanel::bottom("lane").show(ctx, |ui| lane(ui, view.lane.as_ref()));
         egui::SidePanel::left("me")
             .exact_width(330.0)
@@ -94,6 +99,37 @@ impl App {
             build(ui, &view.build, view.me.gold);
         });
         picked
+    }
+}
+
+fn high_elo(ui: &mut egui::Ui, section: &HighEloSection) {
+    let HighEloSection::Recommendation(view) = section else {
+        let HighEloSection::NoData(message) = section else {
+            unreachable!()
+        };
+        ui.label(message);
+        return;
+    };
+    high_elo_recommendation(ui, view);
+}
+
+fn high_elo_recommendation(ui: &mut egui::Ui, view: &HighEloView) {
+    ui.horizontal(|ui| {
+        ui.label(RichText::new(&view.header).strong());
+        if view.low_sample {
+            ui.label(RichText::new("⚠ poucas partidas").color(WARN));
+        }
+    });
+    ui.label(format!(
+        "RUNAS  {} ({})",
+        view.keystone, view.keystone_source
+    ));
+    ui.label(format!("{} · {}", view.primary_style, view.sub_style));
+    if !view.stat_perks.is_empty() {
+        ui.label(format!("Fragmentos: {}", view.stat_perks.join(" · ")));
+    }
+    if !view.summoner_spells.is_empty() {
+        ui.label(format!("FEITIÇOS  {}", view.summoner_spells.join(" · ")));
     }
 }
 

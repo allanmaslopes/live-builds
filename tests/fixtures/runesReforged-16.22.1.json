@@ -1,0 +1,80 @@
+[
+  {
+    "id": 8100,
+    "name": "Dominação",
+    "slots": [
+      { "runes": [{ "id": 8112, "name": "Eletrocutar" }] },
+      { "runes": [{ "id": 8126, "name": "Golpe Desleal" }] },
+      { "runes": [{ "id": 8140, "name": "Lembranças Aterrorizantes" }] },
+      { "runes": [{ "id": 8106, "name": "Caça Suprema" }] }
+    ]
+  },
+  {
+    "id": 8300,
+    "name": "Inspiração",
+    "slots": [
+      { "runes": [{ "id": 8304, "name": "Calçados Mágicos" }] },
+      { "runes": [{ "id": 8313, "name": "Tônico Triplo" }] },
+      { "runes": [{ "id": 8347, "name": "Perspicácia Cósmica" }] }
+    ]
+  },
+  {
+    "id": 8000,
+    "name": "Precisão",
+    "slots": [
+      { "runes": [{ "id": 8008, "name": "Ritmo Fatal" }] },
+      {
+        "runes": [
+          { "id": 9101, "name": "Absorção Vital" },
+          { "id": 8009, "name": "Presença de Espírito" }
+        ]
+      },
+      {
+        "runes": [
+          { "id": 9104, "name": "Lenda: Espontaneidade" },
+          { "id": 9105, "name": "Lenda: Aceleração" },
+          { "id": 9103, "name": "Lenda: Linhagem" }
+        ]
+      },
+      {
+        "runes": [
+          { "id": 8014, "name": "Golpe de Misericórdia" },
+          { "id": 8017, "name": "Dilacerar" }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 8200,
+    "name": "Feitiçaria",
+    "slots": [
+      {
+        "runes": [
+          { "id": 8214, "name": "Invocar Aery" },
+          { "id": 8229, "name": "Cometa Arcano" },
+          { "id": 8992, "name": "Toque Ígneo" }
+        ]
+      },
+      {
+        "runes": [
+          { "id": 8224, "name": "Arcanista do Axioma" },
+          { "id": 8226, "name": "Faixa de Fluxo de Mana" },
+          { "id": 8275, "name": "Manto de Nimbus" }
+        ]
+      },
+      {
+        "runes": [
+          { "id": 8210, "name": "Transcendência" },
+          { "id": 8234, "name": "Celeridade" },
+          { "id": 8233, "name": "Foco Absoluto" }
+        ]
+      },
+      {
+        "runes": [
+          { "id": 8237, "name": "Chamuscar" },
+          { "id": 8236, "name": "Tempestade Crescente" }
+        ]
+      }
+    ]
+  }
+]

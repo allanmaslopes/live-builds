@@ -1,0 +1,1379 @@
+{
+ "formatVersion": 2,
+ "patch": "16.22",
+ "computedAt": "2026-11-07T18:15:17.763669400Z",
+ "matches": 750,
+ "entries": [
+  {
+   "patch": "16.22",
+   "championId": 145,
+   "position": "ANY",
+   "games": 110,
+   "wins": 49,
+   "winRate": 0.4455,
+   "starting": [
+    {
+     "sequence": [
+      1086,
+      2003,
+      2003
+     ],
+     "games": 54,
+     "wins": 17,
+     "winRate": 0.3148
+    },
+    {
+     "sequence": [
+      1086,
+      2003,
+      2003,
+      3340
+     ],
+     "games": 41,
+     "wins": 21,
+     "winRate": 0.5122
+    }
+   ],
+   "boots": [
+    {
+     "sequence": [
+      1001
+     ],
+     "games": 79,
+     "wins": 33,
+     "winRate": 0.4177
+    },
+    {
+     "sequence": [
+      3006
+     ],
+     "games": 24,
+     "wins": 13,
+     "winRate": 0.5417
+    }
+   ],
+   "buildPaths": [
+    {
+     "sequence": [
+      6672,
+      3124,
+      3302
+     ],
+     "games": 33,
+     "wins": 17,
+     "winRate": 0.5152
+    },
+    {
+     "sequence": [
+      6672,
+      3124,
+      3115
+     ],
+     "games": 24,
+     "wins": 12,
+     "winRate": 0.5
+    },
+    {
+     "sequence": [
+      6672,
+      3124
+     ],
+     "games": 14,
+     "wins": 5,
+     "winRate": 0.3571
+    }
+   ],
+   "purchaseTree": [
+    {
+     "sequence": [
+      3051,
+      6672,
+      3006,
+      3124,
+      3051,
+      3302
+     ],
+     "games": 14,
+     "wins": 7,
+     "winRate": 0.5
+    },
+    {
+     "sequence": [
+      3051,
+      6672,
+      3006,
+      3124,
+      3115
+     ],
+     "games": 11,
+     "wins": 6,
+     "winRate": 0.5455
+    }
+   ],
+   "componentsBefore": {
+    "6672": [
+     {
+      "sequence": [
+       3051
+      ],
+      "games": 72,
+      "wins": 34,
+      "winRate": 0.4722
+     }
+    ],
+    "3124": [
+     {
+      "sequence": [
+       3006
+      ],
+      "games": 43,
+      "wins": 22,
+      "winRate": 0.5116
+     }
+    ],
+    "3302": [
+     {
+      "sequence": [
+       3051
+      ],
+      "games": 27,
+      "wins": 15,
+      "winRate": 0.5556
+     }
+    ]
+   },
+   "skillOrders": [
+    {
+     "sequence": [
+      1,
+      2,
+      3,
+      1,
+      1,
+      4,
+      1,
+      3,
+      1
+     ],
+     "games": 56,
+     "wins": 29,
+     "winRate": 0.5179
+    },
+    {
+     "sequence": [
+      1,
+      2,
+      3,
+      1,
+      1,
+      4,
+      1,
+      2,
+      1
+     ],
+     "games": 24,
+     "wins": 7,
+     "winRate": 0.2917
+    }
+   ],
+   "skillPriority": "R > Q > E > W",
+   "itemWinRates": [
+    {
+     "itemId": 3124,
+     "games": 89,
+     "wins": 41,
+     "winRate": 0.4607
+    },
+    {
+     "itemId": 6672,
+     "games": 82,
+     "wins": 37,
+     "winRate": 0.4512
+    },
+    {
+     "itemId": 3302,
+     "games": 42,
+     "wins": 22,
+     "winRate": 0.5238
+    },
+    {
+     "itemId": 3115,
+     "games": 33,
+     "wins": 15,
+     "winRate": 0.4545
+    },
+    {
+     "itemId": 3157,
+     "games": 24,
+     "wins": 11,
+     "winRate": 0.4583
+    },
+    {
+     "itemId": 3087,
+     "games": 17,
+     "wins": 7,
+     "winRate": 0.4118
+    },
+    {
+     "itemId": 3046,
+     "games": 7,
+     "wins": 3,
+     "winRate": 0.4286
+    },
+    {
+     "itemId": 3032,
+     "games": 5,
+     "wins": 2,
+     "winRate": 0.4
+    },
+    {
+     "itemId": 3072,
+     "games": 4,
+     "wins": 3,
+     "winRate": 0.75
+    },
+    {
+     "itemId": 3031,
+     "games": 4,
+     "wins": 2,
+     "winRate": 0.5
+    },
+    {
+     "itemId": 3089,
+     "games": 4,
+     "wins": 1,
+     "winRate": 0.25
+    },
+    {
+     "itemId": 4645,
+     "games": 4,
+     "wins": 1,
+     "winRate": 0.25
+    },
+    {
+     "itemId": 2510,
+     "games": 2,
+     "wins": 1,
+     "winRate": 0.5
+    },
+    {
+     "itemId": 3026,
+     "games": 2,
+     "wins": 1,
+     "winRate": 0.5
+    },
+    {
+     "itemId": 3033,
+     "games": 2,
+     "wins": 1,
+     "winRate": 0.5
+    },
+    {
+     "itemId": 3085,
+     "games": 2,
+     "wins": 0,
+     "winRate": 0.0
+    },
+    {
+     "itemId": 3091,
+     "games": 1,
+     "wins": 1,
+     "winRate": 1.0
+    },
+    {
+     "itemId": 6699,
+     "games": 1,
+     "wins": 1,
+     "winRate": 1.0
+    },
+    {
+     "itemId": 2523,
+     "games": 1,
+     "wins": 0,
+     "winRate": 0.0
+    },
+    {
+     "itemId": 3042,
+     "games": 1,
+     "wins": 0,
+     "winRate": 0.0
+    },
+    {
+     "itemId": 3102,
+     "games": 1,
+     "wins": 0,
+     "winRate": 0.0
+    },
+    {
+     "itemId": 3165,
+     "games": 1,
+     "wins": 0,
+     "winRate": 0.0
+    }
+   ],
+   "lowSample": false,
+   "keystones": [
+    {
+     "perk": 8008,
+     "games": 110,
+     "wins": 49,
+     "winRate": 0.4455,
+     "lowSample": false
+    }
+   ],
+   "runePages": [
+    {
+     "keystone": 8008,
+     "primaryStyle": 8000,
+     "subStyle": 8300,
+     "perks": [
+      8008,
+      8009,
+      9103,
+      8017,
+      8313,
+      8347
+     ],
+     "statPerks": {
+      "offense": 5005,
+      "flex": 5008,
+      "defense": 5011
+     },
+     "games": 12,
+     "wins": 6,
+     "winRate": 0.5,
+     "lowSample": false,
+     "buildPath": {
+      "sequence": [
+       6672,
+       3124,
+       3302
+      ],
+      "games": 33,
+      "wins": 17,
+      "winRate": 0.5152
+     },
+     "buildPathLowSample": false
+    }
+   ],
+   "summonerSpells": [
+    {
+     "sequence": [
+      4,
+      21
+     ],
+     "games": 46,
+     "wins": 24,
+     "winRate": 0.5217,
+     "lowSample": false
+    },
+    {
+     "sequence": [
+      3,
+      4
+     ],
+     "games": 44,
+     "wins": 19,
+     "winRate": 0.4318,
+     "lowSample": false
+    },
+    {
+     "sequence": [
+      1,
+      4
+     ],
+     "games": 11,
+     "wins": 4,
+     "winRate": 0.3636,
+     "lowSample": false
+    },
+    {
+     "sequence": [
+      4,
+      6
+     ],
+     "games": 7,
+     "wins": 2,
+     "winRate": 0.2857,
+     "lowSample": true
+    },
+    {
+     "sequence": [
+      4,
+      12
+     ],
+     "games": 1,
+     "wins": 0,
+     "winRate": 0.0,
+     "lowSample": true
+    }
+   ],
+   "primary": {
+    "keystone": 8008,
+    "summonerSpells": [
+     4,
+     21
+    ],
+    "summonerSpellsLowSample": false
+   }
+  },
+  {
+   "patch": "16.22",
+   "championId": 145,
+   "position": "BOTTOM",
+   "games": 106,
+   "wins": 48,
+   "winRate": 0.4528,
+   "starting": [
+    {
+     "sequence": [
+      1086,
+      2003,
+      2003
+     ],
+     "games": 50,
+     "wins": 16,
+     "winRate": 0.32
+    },
+    {
+     "sequence": [
+      1086,
+      2003,
+      2003,
+      3340
+     ],
+     "games": 41,
+     "wins": 21,
+     "winRate": 0.5122
+    }
+   ],
+   "boots": [
+    {
+     "sequence": [
+      1001
+     ],
+     "games": 76,
+     "wins": 32,
+     "winRate": 0.4211
+    },
+    {
+     "sequence": [
+      3006
+     ],
+     "games": 23,
+     "wins": 13,
+     "winRate": 0.5652
+    }
+   ],
+   "buildPaths": [
+    {
+     "sequence": [
+      6672,
+      3124,
+      3302
+     ],
+     "games": 32,
+     "wins": 17,
+     "winRate": 0.5313
+    },
+    {
+     "sequence": [
+      6672,
+      3124,
+      3115
+     ],
+     "games": 24,
+     "wins": 12,
+     "winRate": 0.5
+    },
+    {
+     "sequence": [
+      6672,
+      3124
+     ],
+     "games": 14,
+     "wins": 5,
+     "winRate": 0.3571
+    }
+   ],
+   "purchaseTree": [
+    {
+     "sequence": [
+      3051,
+      6672,
+      3006,
+      3124,
+      3051,
+      3302
+     ],
+     "games": 14,
+     "wins": 7,
+     "winRate": 0.5
+    },
+    {
+     "sequence": [
+      3051,
+      6672,
+      3006,
+      3124,
+      3115
+     ],
+     "games": 11,
+     "wins": 6,
+     "winRate": 0.5455
+    }
+   ],
+   "componentsBefore": {
+    "6672": [
+     {
+      "sequence": [
+       3051
+      ],
+      "games": 72,
+      "wins": 34,
+      "winRate": 0.4722
+     }
+    ],
+    "3124": [
+     {
+      "sequence": [
+       3006
+      ],
+      "games": 42,
+      "wins": 22,
+      "winRate": 0.5238
+     }
+    ],
+    "3302": [
+     {
+      "sequence": [
+       3051
+      ],
+      "games": 26,
+      "wins": 15,
+      "winRate": 0.5769
+     }
+    ]
+   },
+   "skillOrders": [
+    {
+     "sequence": [
+      1,
+      2,
+      3,
+      1,
+      1,
+      4,
+      1,
+      3,
+      1
+     ],
+     "games": 56,
+     "wins": 29,
+     "winRate": 0.5179
+    },
+    {
+     "sequence": [
+      1,
+      2,
+      3,
+      1,
+      1,
+      4,
+      1,
+      2,
+      1
+     ],
+     "games": 22,
+     "wins": 7,
+     "winRate": 0.3182
+    }
+   ],
+   "skillPriority": "R > Q > E > W",
+   "itemWinRates": [
+    {
+     "itemId": 3124,
+     "games": 87,
+     "wins": 41,
+     "winRate": 0.4713
+    },
+    {
+     "itemId": 6672,
+     "games": 81,
+     "wins": 37,
+     "winRate": 0.4568
+    },
+    {
+     "itemId": 3302,
+     "games": 41,
+     "wins": 22,
+     "winRate": 0.5366
+    },
+    {
+     "itemId": 3115,
+     "games": 32,
+     "wins": 15,
+     "winRate": 0.4688
+    },
+    {
+     "itemId": 3157,
+     "games": 22,
+     "wins": 11,
+     "winRate": 0.5
+    },
+    {
+     "itemId": 3087,
+     "games": 14,
+     "wins": 6,
+     "winRate": 0.4286
+    },
+    {
+     "itemId": 3046,
+     "games": 7,
+     "wins": 3,
+     "winRate": 0.4286
+    },
+    {
+     "itemId": 3032,
+     "games": 5,
+     "wins": 2,
+     "winRate": 0.4
+    },
+    {
+     "itemId": 3072,
+     "games": 4,
+     "wins": 3,
+     "winRate": 0.75
+    },
+    {
+     "itemId": 3031,
+     "games": 4,
+     "wins": 2,
+     "winRate": 0.5
+    },
+    {
+     "itemId": 3089,
+     "games": 4,
+     "wins": 1,
+     "winRate": 0.25
+    },
+    {
+     "itemId": 4645,
+     "games": 3,
+     "wins": 1,
+     "winRate": 0.3333
+    },
+    {
+     "itemId": 2510,
+     "games": 2,
+     "wins": 1,
+     "winRate": 0.5
+    },
+    {
+     "itemId": 3026,
+     "games": 2,
+     "wins": 1,
+     "winRate": 0.5
+    },
+    {
+     "itemId": 3033,
+     "games": 2,
+     "wins": 1,
+     "winRate": 0.5
+    },
+    {
+     "itemId": 3085,
+     "games": 2,
+     "wins": 0,
+     "winRate": 0.0
+    },
+    {
+     "itemId": 3091,
+     "games": 1,
+     "wins": 1,
+     "winRate": 1.0
+    },
+    {
+     "itemId": 2523,
+     "games": 1,
+     "wins": 0,
+     "winRate": 0.0
+    },
+    {
+     "itemId": 3102,
+     "games": 1,
+     "wins": 0,
+     "winRate": 0.0
+    },
+    {
+     "itemId": 3165,
+     "games": 1,
+     "wins": 0,
+     "winRate": 0.0
+    }
+   ],
+   "lowSample": false,
+   "keystones": [
+    {
+     "perk": 8008,
+     "games": 106,
+     "wins": 48,
+     "winRate": 0.4528,
+     "lowSample": false
+    }
+   ],
+   "runePages": [
+    {
+     "keystone": 8008,
+     "primaryStyle": 8000,
+     "subStyle": 8300,
+     "perks": [
+      8008,
+      8009,
+      9103,
+      8017,
+      8313,
+      8347
+     ],
+     "statPerks": {
+      "offense": 5005,
+      "flex": 5008,
+      "defense": 5011
+     },
+     "games": 12,
+     "wins": 6,
+     "winRate": 0.5,
+     "lowSample": false,
+     "buildPath": {
+      "sequence": [
+       6672,
+       3124,
+       3302
+      ],
+      "games": 32,
+      "wins": 17,
+      "winRate": 0.5313
+     },
+     "buildPathLowSample": false
+    }
+   ],
+   "summonerSpells": [
+    {
+     "sequence": [
+      4,
+      21
+     ],
+     "games": 45,
+     "wins": 23,
+     "winRate": 0.5111,
+     "lowSample": false
+    },
+    {
+     "sequence": [
+      3,
+      4
+     ],
+     "games": 42,
+     "wins": 19,
+     "winRate": 0.4524,
+     "lowSample": false
+    },
+    {
+     "sequence": [
+      1,
+      4
+     ],
+     "games": 11,
+     "wins": 4,
+     "winRate": 0.3636,
+     "lowSample": false
+    },
+    {
+     "sequence": [
+      4,
+      6
+     ],
+     "games": 7,
+     "wins": 2,
+     "winRate": 0.2857,
+     "lowSample": true
+    },
+    {
+     "sequence": [
+      6,
+      21
+     ],
+     "games": 1,
+     "wins": 0,
+     "winRate": 0.0,
+     "lowSample": true
+    }
+   ],
+   "primary": {
+    "keystone": 8008,
+    "summonerSpells": [
+     4,
+     21
+    ],
+    "summonerSpellsLowSample": false
+   }
+  },
+  {
+   "patch": "16.22",
+   "championId": 145,
+   "position": "MIDDLE",
+   "games": 3,
+   "wins": 1,
+   "winRate": 0.3333,
+   "starting": [],
+   "boots": [],
+   "buildPaths": [],
+   "purchaseTree": [],
+   "componentsBefore": {},
+   "skillOrders": [],
+   "skillPriority": "R > Q > W > E",
+   "itemWinRates": [
+    {
+     "itemId": 3087,
+     "games": 3,
+     "wins": 1,
+     "winRate": 0.3333
+    },
+    {
+     "itemId": 6699,
+     "games": 1,
+     "wins": 1,
+     "winRate": 1.0
+    },
+    {
+     "itemId": 3042,
+     "games": 1,
+     "wins": 0,
+     "winRate": 0.0
+    },
+    {
+     "itemId": 3115,
+     "games": 1,
+     "wins": 0,
+     "winRate": 0.0
+    },
+    {
+     "itemId": 3124,
+     "games": 1,
+     "wins": 0,
+     "winRate": 0.0
+    },
+    {
+     "itemId": 3157,
+     "games": 1,
+     "wins": 0,
+     "winRate": 0.0
+    },
+    {
+     "itemId": 4645,
+     "games": 1,
+     "wins": 0,
+     "winRate": 0.0
+    }
+   ],
+   "lowSample": true,
+   "keystones": [
+    {
+     "perk": 8008,
+     "games": 3,
+     "wins": 1,
+     "winRate": 0.3333,
+     "lowSample": true
+    }
+   ],
+   "runePages": [
+    {
+     "keystone": 8008,
+     "primaryStyle": 8000,
+     "subStyle": 8300,
+     "perks": [
+      8008,
+      9101,
+      9103,
+      8017,
+      8313,
+      8347
+     ],
+     "statPerks": null,
+     "games": 1,
+     "wins": 1,
+     "winRate": 1.0,
+     "lowSample": true,
+     "buildPath": {
+      "sequence": [
+       3087,
+       3004,
+       4645
+      ],
+      "games": 1,
+      "wins": 0,
+      "winRate": 0.0
+     },
+     "buildPathLowSample": true
+    }
+   ],
+   "summonerSpells": [
+    {
+     "sequence": [
+      4,
+      21
+     ],
+     "games": 1,
+     "wins": 1,
+     "winRate": 1.0,
+     "lowSample": true
+    },
+    {
+     "sequence": [
+      3,
+      4
+     ],
+     "games": 1,
+     "wins": 0,
+     "winRate": 0.0,
+     "lowSample": true
+    },
+    {
+     "sequence": [
+      4,
+      12
+     ],
+     "games": 1,
+     "wins": 0,
+     "winRate": 0.0,
+     "lowSample": true
+    }
+   ],
+   "primary": {
+    "keystone": 8008,
+    "summonerSpells": [
+     4,
+     21
+    ],
+    "summonerSpellsLowSample": true
+   }
+  },
+  {
+   "patch": "16.22",
+   "championId": 145,
+   "position": "TOP",
+   "games": 1,
+   "wins": 0,
+   "winRate": 0.0,
+   "starting": [],
+   "boots": [],
+   "buildPaths": [],
+   "purchaseTree": [],
+   "componentsBefore": {},
+   "skillOrders": [],
+   "skillPriority": "R > Q > W > E",
+   "itemWinRates": [
+    {
+     "itemId": 3124,
+     "games": 1,
+     "wins": 0,
+     "winRate": 0.0
+    },
+    {
+     "itemId": 3157,
+     "games": 1,
+     "wins": 0,
+     "winRate": 0.0
+    },
+    {
+     "itemId": 3302,
+     "games": 1,
+     "wins": 0,
+     "winRate": 0.0
+    },
+    {
+     "itemId": 6672,
+     "games": 1,
+     "wins": 0,
+     "winRate": 0.0
+    }
+   ],
+   "lowSample": true,
+   "keystones": [
+    {
+     "perk": 8008,
+     "games": 1,
+     "wins": 0,
+     "winRate": 0.0,
+     "lowSample": true
+    }
+   ],
+   "runePages": [
+    {
+     "keystone": 8008,
+     "primaryStyle": 8000,
+     "subStyle": 8300,
+     "perks": [
+      8008,
+      9101,
+      9104,
+      8014,
+      8313,
+      8347
+     ],
+     "statPerks": null,
+     "games": 1,
+     "wins": 0,
+     "winRate": 0.0,
+     "lowSample": true,
+     "buildPath": {
+      "sequence": [
+       6672,
+       3124,
+       3302
+      ],
+      "games": 1,
+      "wins": 0,
+      "winRate": 0.0
+     },
+     "buildPathLowSample": true
+    }
+   ],
+   "summonerSpells": [
+    {
+     "sequence": [
+      3,
+      4
+     ],
+     "games": 1,
+     "wins": 0,
+     "winRate": 0.0,
+     "lowSample": true
+    }
+   ],
+   "primary": {
+    "keystone": 8008,
+    "summonerSpells": [
+     3,
+     4
+    ],
+    "summonerSpellsLowSample": true
+   }
+  },
+  {
+   "patch": "16.22",
+   "championId": 1,
+   "position": "ANY",
+   "games": 18,
+   "wins": 9,
+   "winRate": 0.5,
+   "starting": [
+    {
+     "sequence": [
+      1056,
+      2003,
+      2003
+     ],
+     "games": 10,
+     "wins": 6,
+     "winRate": 0.6
+    }
+   ],
+   "boots": [
+    {
+     "sequence": [
+      1001
+     ],
+     "games": 15,
+     "wins": 8,
+     "winRate": 0.5333
+    }
+   ],
+   "buildPaths": [],
+   "purchaseTree": [],
+   "componentsBefore": {
+    "3118": [
+     {
+      "sequence": [
+       3802
+      ],
+      "games": 11,
+      "wins": 7,
+      "winRate": 0.6364
+     }
+    ]
+   },
+   "skillOrders": [],
+   "skillPriority": "R > Q > W > E",
+   "itemWinRates": [
+    {
+     "itemId": 3118,
+     "games": 13,
+     "wins": 8,
+     "winRate": 0.6154
+    },
+    {
+     "itemId": 3157,
+     "games": 4,
+     "wins": 3,
+     "winRate": 0.75
+    },
+    {
+     "itemId": 4645,
+     "games": 3,
+     "wins": 3,
+     "winRate": 1.0
+    },
+    {
+     "itemId": 3152,
+     "games": 3,
+     "wins": 2,
+     "winRate": 0.6667
+    },
+    {
+     "itemId": 3089,
+     "games": 2,
+     "wins": 2,
+     "winRate": 1.0
+    },
+    {
+     "itemId": 2065,
+     "games": 2,
+     "wins": 0,
+     "winRate": 0.0
+    },
+    {
+     "itemId": 2503,
+     "games": 2,
+     "wins": 0,
+     "winRate": 0.0
+    },
+    {
+     "itemId": 4646,
+     "games": 2,
+     "wins": 0,
+     "winRate": 0.0
+    },
+    {
+     "itemId": 6653,
+     "games": 1,
+     "wins": 1,
+     "winRate": 1.0
+    },
+    {
+     "itemId": 3116,
+     "games": 1,
+     "wins": 0,
+     "winRate": 0.0
+    },
+    {
+     "itemId": 3137,
+     "games": 1,
+     "wins": 0,
+     "winRate": 0.0
+    }
+   ],
+   "lowSample": true,
+   "keystones": [
+    {
+     "perk": 8112,
+     "games": 10,
+     "wins": 7,
+     "winRate": 0.7,
+     "lowSample": false
+    },
+    {
+     "perk": 8229,
+     "games": 4,
+     "wins": 2,
+     "winRate": 0.5,
+     "lowSample": true
+    },
+    {
+     "perk": 8214,
+     "games": 2,
+     "wins": 0,
+     "winRate": 0.0,
+     "lowSample": true
+    },
+    {
+     "perk": 8992,
+     "games": 2,
+     "wins": 0,
+     "winRate": 0.0,
+     "lowSample": true
+    }
+   ],
+   "runePages": [
+    {
+     "keystone": 8112,
+     "primaryStyle": 8100,
+     "subStyle": 8200,
+     "perks": [
+      8112,
+      8126,
+      8140,
+      8106,
+      8233,
+      8236
+     ],
+     "statPerks": {
+      "offense": 5005,
+      "flex": 5008,
+      "defense": 5011
+     },
+     "games": 2,
+     "wins": 1,
+     "winRate": 0.5,
+     "lowSample": true,
+     "buildPath": {
+      "sequence": [
+       3118,
+       3152,
+       3089
+      ],
+      "games": 1,
+      "wins": 1,
+      "winRate": 1.0
+     },
+     "buildPathLowSample": true
+    },
+    {
+     "keystone": 8229,
+     "primaryStyle": 8200,
+     "subStyle": 8000,
+     "perks": [
+      8229,
+      8224,
+      8233,
+      8237,
+      8009,
+      8017
+     ],
+     "statPerks": {
+      "offense": 5005,
+      "flex": 5008,
+      "defense": 5001
+     },
+     "games": 3,
+     "wins": 2,
+     "winRate": 0.6667,
+     "lowSample": true,
+     "buildPath": {
+      "sequence": [
+       3118,
+       3152,
+       3089
+      ],
+      "games": 1,
+      "wins": 1,
+      "winRate": 1.0
+     },
+     "buildPathLowSample": true
+    },
+    {
+     "keystone": 8214,
+     "primaryStyle": 8200,
+     "subStyle": 8300,
+     "perks": [
+      8214,
+      8275,
+      8210,
+      8237,
+      8347,
+      8304
+     ],
+     "statPerks": {
+      "offense": 5008,
+      "flex": 5008,
+      "defense": 5011
+     },
+     "games": 2,
+     "wins": 0,
+     "winRate": 0.0,
+     "lowSample": true,
+     "buildPath": {
+      "sequence": [
+       3118,
+       3137,
+       2065
+      ],
+      "games": 1,
+      "wins": 0,
+      "winRate": 0.0
+     },
+     "buildPathLowSample": true
+    },
+    {
+     "keystone": 8992,
+     "primaryStyle": 8200,
+     "subStyle": 8000,
+     "perks": [
+      8992,
+      8226,
+      8234,
+      8237,
+      8017,
+      9105
+     ],
+     "statPerks": null,
+     "games": 1,
+     "wins": 0,
+     "winRate": 0.0,
+     "lowSample": true,
+     "buildPath": {
+      "sequence": [
+       3118,
+       3152,
+       3089
+      ],
+      "games": 1,
+      "wins": 1,
+      "winRate": 1.0
+     },
+     "buildPathLowSample": true
+    }
+   ],
+   "summonerSpells": [
+    {
+     "sequence": [
+      4,
+      12
+     ],
+     "games": 8,
+     "wins": 5,
+     "winRate": 0.625,
+     "lowSample": true
+    },
+    {
+     "sequence": [
+      4,
+      14
+     ],
+     "games": 7,
+     "wins": 4,
+     "winRate": 0.5714,
+     "lowSample": true
+    },
+    {
+     "sequence": [
+      4,
+      7
+     ],
+     "games": 3,
+     "wins": 0,
+     "winRate": 0.0,
+     "lowSample": true
+    }
+   ],
+   "primary": {
+    "keystone": 8112,
+    "summonerSpells": [
+     4,
+     12
+    ],
+    "summonerSpellsLowSample": true
+   }
+  }
+ ]
+}

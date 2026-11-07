@@ -1,4 +1,5 @@
 use crate::catalog::ItemCatalog;
+use crate::knowledge::KnowledgeNames;
 use crate::riot_build::parse_riot_recommendations;
 use crate::riot_build::{RecommendedBuild, SkillOrder};
 use serde::Deserialize;
@@ -11,6 +12,16 @@ pub struct StaticData {
     pub catalog: ItemCatalog,
     pub catalog_patch: String,
     pub stale: bool,
+    pub knowledge_names: KnowledgeNames,
+    champion_ids: HashMap<String, u32>,
+}
+
+impl StaticData {
+    pub fn champion_id(&self, champion: &str) -> Option<u32> {
+        self.champion_ids
+            .get(&champion.to_ascii_lowercase())
+            .copied()
+    }
 }
 
 type FetchFn = dyn Fn(&str) -> Result<String, String> + Send + Sync;
@@ -50,12 +61,7 @@ impl StaticSource {
         let requested = short_version(game_version)
             .ok_or_else(|| format!("Invalid game version: {game_version}"))?;
         if let Some(catalog) = self.cached_catalog(Some(requested)) {
-            let _ = self.cache_champions(&catalog.patch);
-            return Ok(StaticData {
-                catalog_patch: catalog.patch.clone(),
-                catalog,
-                stale: false,
-            });
+            return Ok(self.with_metadata(catalog, false));
         }
 
         let remote = (|| {
@@ -84,19 +90,48 @@ impl StaticSource {
         })();
 
         match remote {
-            Ok(catalog) => Ok(StaticData {
-                catalog_patch: catalog.patch.clone(),
-                catalog,
-                stale: false,
-            }),
+            Ok(catalog) => Ok(self.with_metadata(catalog, false)),
             Err(error) => self
                 .cached_catalog(None)
-                .map(|catalog| StaticData {
-                    catalog_patch: catalog.patch.clone(),
-                    catalog,
-                    stale: true,
-                })
+                .map(|catalog| self.with_metadata(catalog, true))
                 .ok_or(error),
+        }
+    }
+
+    fn with_metadata(&self, catalog: ItemCatalog, stale: bool) -> StaticData {
+        let patch = catalog.patch.clone();
+        let _ = self.cache_champions(&patch);
+        let _ = self.cache_runes(&patch);
+        let _ = self.cache_summoner_spells(&patch);
+        let champions = fs::read_to_string(self.cache_dir.join(&patch).join("champion.json"))
+            .ok()
+            .and_then(|json| parse_champions(&patch, &json));
+        let champion_ids = champions.map_or_else(HashMap::new, |champions| {
+            champions
+                .data
+                .into_values()
+                .filter_map(|champion| {
+                    let key = champion.key?.parse().ok()?;
+                    Some((champion.name.to_ascii_lowercase(), key))
+                })
+                .collect()
+        });
+        let mut knowledge_names =
+            fs::read_to_string(self.cache_dir.join(&patch).join("runesReforged.json"))
+                .ok()
+                .and_then(|json| parse_runes(&json))
+                .unwrap_or_default();
+        knowledge_names.summoner_spells =
+            fs::read_to_string(self.cache_dir.join(&patch).join("summoner.json"))
+                .ok()
+                .and_then(|json| parse_summoner_spells(&patch, &json))
+                .unwrap_or_default();
+        StaticData {
+            catalog_patch: patch,
+            catalog,
+            stale,
+            knowledge_names,
+            champion_ids,
         }
     }
 
@@ -168,6 +203,35 @@ impl StaticSource {
         write_atomic(&path, &json)
     }
 
+    fn cache_runes(&self, patch: &str) -> Result<(), String> {
+        let path = self.cache_dir.join(patch).join("runesReforged.json");
+        if let Ok(json) = fs::read_to_string(&path)
+            && parse_runes(&json).is_some()
+        {
+            return Ok(());
+        }
+        let json = (self.fetch)(&format!(
+            "https://ddragon.leagueoflegends.com/cdn/{patch}/data/pt_BR/runesReforged.json"
+        ))?;
+        parse_runes(&json).ok_or_else(|| "Invalid Data Dragon rune catalog".to_owned())?;
+        write_atomic(&path, &json)
+    }
+
+    fn cache_summoner_spells(&self, patch: &str) -> Result<(), String> {
+        let path = self.cache_dir.join(patch).join("summoner.json");
+        if let Ok(json) = fs::read_to_string(&path)
+            && parse_summoner_spells(patch, &json).is_some()
+        {
+            return Ok(());
+        }
+        let json = (self.fetch)(&format!(
+            "https://ddragon.leagueoflegends.com/cdn/{patch}/data/pt_BR/summoner.json"
+        ))?;
+        parse_summoner_spells(patch, &json)
+            .ok_or_else(|| "Invalid Data Dragon summoner spell catalog".to_owned())?;
+        write_atomic(&path, &json)
+    }
+
     fn cached_catalog(&self, requested: Option<(u32, u32)>) -> Option<ItemCatalog> {
         fs::read_dir(&self.cache_dir)
             .ok()?
@@ -197,6 +261,40 @@ struct DDragonChampions {
 #[derive(Deserialize)]
 struct DDragonChampion {
     id: String,
+    #[serde(default)]
+    key: Option<String>,
+    name: String,
+}
+
+#[derive(Deserialize)]
+struct DDragonRuneStyle {
+    id: u32,
+    name: String,
+    slots: Vec<DDragonRuneSlot>,
+}
+
+#[derive(Deserialize)]
+struct DDragonRuneSlot {
+    runes: Vec<DDragonRune>,
+}
+
+#[derive(Deserialize)]
+struct DDragonRune {
+    id: u32,
+    name: String,
+}
+
+#[derive(Deserialize)]
+struct DDragonSummonerSpells {
+    #[serde(rename = "type")]
+    kind: String,
+    version: String,
+    data: HashMap<String, DDragonSummonerSpell>,
+}
+
+#[derive(Deserialize)]
+struct DDragonSummonerSpell {
+    key: String,
     name: String,
 }
 
@@ -211,6 +309,33 @@ fn parse_champions(patch: &str, json: &str) -> Option<DDragonChampions> {
                 && !champion.name.trim().is_empty()
         }))
     .then_some(champions)
+}
+
+fn parse_runes(json: &str) -> Option<KnowledgeNames> {
+    let styles: Vec<DDragonRuneStyle> = serde_json::from_str(json).ok()?;
+    if styles.is_empty() {
+        return None;
+    }
+    let mut names = KnowledgeNames::default();
+    for style in styles {
+        names.styles.insert(style.id, style.name);
+        for rune in style.slots.into_iter().flat_map(|slot| slot.runes) {
+            names.runes.insert(rune.id, rune.name);
+        }
+    }
+    Some(names)
+}
+
+fn parse_summoner_spells(patch: &str, json: &str) -> Option<HashMap<u32, String>> {
+    let spells: DDragonSummonerSpells = serde_json::from_str(json).ok()?;
+    if spells.kind != "summoner" || spells.version != patch || spells.data.is_empty() {
+        return None;
+    }
+    spells
+        .data
+        .into_values()
+        .map(|spell| Some((spell.key.parse().ok()?, spell.name)))
+        .collect()
 }
 
 fn valid_champion_alias(alias: &str) -> bool {
@@ -319,6 +444,21 @@ mod tests {
                 .to_string());
             }
             if url
+                == format!(
+                    "https://ddragon.leagueoflegends.com/cdn/{patch}/data/pt_BR/runesReforged.json"
+                )
+            {
+                return Ok(include_str!("../tests/fixtures/runesReforged-16.22.1.json").to_owned());
+            }
+            if url
+                == format!(
+                    "https://ddragon.leagueoflegends.com/cdn/{patch}/data/pt_BR/summoner.json"
+                )
+            {
+                return Ok(include_str!("../tests/fixtures/summoner-16.22.1.json")
+                    .replace("16.22.1", &patch));
+            }
+            if url
                 == "https://raw.communitydragon.org/16.22/game/data/characters/thresh/thresh.bin.json"
                 || url
                     == "https://raw.communitydragon.org/16.22/game/data/characters/monkeyking/monkeyking.bin.json"
@@ -354,6 +494,22 @@ mod tests {
         );
         assert!(calls.iter().any(|url| url
             == "https://raw.communitydragon.org/16.22/game/data/characters/thresh/thresh.bin.json"));
+    }
+
+    #[test]
+    fn loads_knowledge_names_and_champion_id() {
+        let cache = tempfile::tempdir().unwrap();
+        let source = fixture_source(cache.path(), "16.22.2", Arc::new(Mutex::new(Vec::new())));
+
+        let data = source.load("16.22.712.1234").unwrap();
+
+        assert_eq!(data.champion_id("Thresh"), Some(412));
+        assert_eq!(data.knowledge_names.style(8000), "Precisão");
+        assert_eq!(data.knowledge_names.rune(8008), "Ritmo Fatal");
+        assert_eq!(data.knowledge_names.summoner_spell(4), "Flash");
+        assert_eq!(data.knowledge_names.summoner_spell(21), "Barreira");
+        assert!(cache.path().join("16.22.2/runesReforged.json").is_file());
+        assert!(cache.path().join("16.22.2/summoner.json").is_file());
     }
 
     #[test]

@@ -1,4 +1,5 @@
 use crate::catalog::{BOOTS, ItemCatalog, MAGICAL_FOOTWEAR, MAGICAL_FOOTWEAR_RUNE};
+use crate::knowledge::{KnowledgeEntry, KnowledgeNames, KnowledgePackage, RunePage};
 use crate::live::{GameSnapshot, PlayerInfo};
 use crate::riot_build::{RecommendedBuild, SkillOrder};
 use std::collections::HashMap;
@@ -11,12 +12,41 @@ const SKILL_LETTERS: [char; 4] = ['Q', 'W', 'E', 'R'];
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PanelView {
+    pub high_elo: HighEloSection,
     pub me: MeView,
     pub build: BuildView,
     pub skills: SkillView,
     pub teams: Vec<TeamView>,
     pub lane: Option<LaneView>,
     pub catalog_note: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum HighEloSection {
+    Recommendation(HighEloView),
+    NoData(String),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct HighEloView {
+    pub header: String,
+    pub low_sample: bool,
+    pub keystone: String,
+    pub keystone_source: String,
+    pub primary_style: String,
+    pub primary_runes: usize,
+    pub sub_style: String,
+    pub sub_runes: usize,
+    pub stat_perks: Vec<String>,
+    pub summoner_spells: Vec<String>,
+}
+
+pub struct HighEloData<'a> {
+    pub package: &'a KnowledgePackage,
+    pub entry: &'a KnowledgeEntry,
+    pub page: Option<&'a RunePage>,
+    pub names: &'a KnowledgeNames,
+    pub player_keystone: Option<u32>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -113,12 +143,115 @@ pub fn build_view(
     };
 
     PanelView {
+        high_elo: HighEloSection::NoData("Sem dados para este campeão".to_owned()),
         me,
         build: build_section(c, b, owned, gold, &s.active.rune_ids),
         skills: skill_section(s, skills),
         teams: team_section(s, c, me_info),
         lane: me_info.and_then(|me| lane_section(s, c, me, lane_pick)),
         catalog_note,
+    }
+}
+
+pub fn build_view_with_knowledge(
+    s: &GameSnapshot,
+    c: &ItemCatalog,
+    b: &RecommendedBuild,
+    skills: Option<&SkillOrder>,
+    lane_pick: Option<&str>,
+    catalog_note: Option<String>,
+    high_elo: Option<HighEloData<'_>>,
+) -> PanelView {
+    let mut panel = build_view(s, c, b, skills, lane_pick, catalog_note);
+    if let Some(data) = high_elo {
+        let page = data.page;
+        let primary = data.entry.primary.as_ref();
+        let keystone = page
+            .map(|page| page.keystone)
+            .or_else(|| primary.map(|primary| primary.keystone));
+        let games_label = if data.entry.games == 1 {
+            "partida"
+        } else {
+            "partidas"
+        };
+        panel.high_elo = HighEloSection::Recommendation(HighEloView {
+            header: format!(
+                "{} · {} · elo alto {} ({} {}, {:.0}%)",
+                panel.me.champion,
+                data.entry.position,
+                data.package.patch,
+                data.entry.games,
+                games_label,
+                data.entry.win_rate * 100.0
+            ),
+            low_sample: data.entry.low_sample
+                || page.is_some_and(|page| page.low_sample)
+                || page.is_some_and(|page| page.build_path.is_some() && page.build_path_low_sample)
+                || primary.is_some_and(|primary| primary.summoner_spells_low_sample),
+            keystone: keystone.map_or_else(String::new, |id| data.names.rune(id)),
+            keystone_source: if page.is_some_and(|page| data.player_keystone == Some(page.keystone))
+            {
+                "sua".to_owned()
+            } else {
+                "recomendada".to_owned()
+            },
+            primary_style: page.map_or_else(String::new, |page| {
+                format!(
+                    "{}: {}",
+                    data.names.style(page.primary_style),
+                    page.perks
+                        .iter()
+                        .take(4)
+                        .map(|&id| data.names.rune(id))
+                        .collect::<Vec<_>>()
+                        .join(" · ")
+                )
+            }),
+            primary_runes: page.map_or(0, |page| page.perks.len().min(4)),
+            sub_style: page.map_or_else(String::new, |page| {
+                format!(
+                    "{}: {}",
+                    data.names.style(page.sub_style),
+                    page.perks
+                        .iter()
+                        .skip(4)
+                        .take(2)
+                        .map(|&id| data.names.rune(id))
+                        .collect::<Vec<_>>()
+                        .join(" · ")
+                )
+            }),
+            sub_runes: page.map_or(0, |page| page.perks.len().saturating_sub(4)),
+            stat_perks: page
+                .and_then(|page| page.stat_perks.as_ref())
+                .map(|stats| {
+                    [stats.offense, stats.flex, stats.defense]
+                        .into_iter()
+                        .map(stat_perk_name)
+                        .collect()
+                })
+                .unwrap_or_default(),
+            summoner_spells: primary
+                .into_iter()
+                .flat_map(|primary| primary.summoner_spells.iter())
+                .map(|&id| data.names.summoner_spell(id))
+                .collect(),
+        });
+    }
+    panel
+}
+
+// shortcut: tabela fixa, trocar se a Riot mudar os fragmentos.
+fn stat_perk_name(id: u32) -> String {
+    match id {
+        5001 => "Vida escalável".to_owned(),
+        5005 => "Vel. de ataque".to_owned(),
+        5007 => "Aceleração de habilidade".to_owned(),
+        5008 => "Força adaptativa".to_owned(),
+        5010 => "Vel. de movimento".to_owned(),
+        5011 => "Vida".to_owned(),
+        5013 => "Tenacidade e Lentidão".to_owned(),
+        _ => id.to_string(),
     }
 }
 
@@ -261,7 +394,7 @@ fn build_section(
         blocks,
         next_item,
         affordable_now,
-        empty_message: empty.then(|| "Sem build recomendada da Riot para este campeão".to_owned()),
+        empty_message: empty.then(|| "Sem build recomendada para este campeão".to_owned()),
         free_boots_line: free_boots.then(|| "Botas grátis pela runa (Calçados Mágicos)".to_owned()),
     }
 }
@@ -408,6 +541,7 @@ fn lane_section(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::knowledge::{KnowledgePackage, select_page};
     use crate::live::parse_all_game_data;
     use crate::riot_build::{ItemStage, parse_riot_recommendations};
 
@@ -446,6 +580,217 @@ mod tests {
     fn set_items(s: &mut GameSnapshot, gold: f64, items: &[u32]) {
         s.active.current_gold = gold;
         s.players[0].items = items.to_vec();
+    }
+
+    fn rune_names() -> KnowledgeNames {
+        KnowledgeNames {
+            runes: HashMap::from([
+                (8008, "Ritmo Fatal".to_owned()),
+                (8009, "Presença de Espírito".to_owned()),
+                (9103, "Lenda: Linhagem".to_owned()),
+                (8017, "Dilacerar".to_owned()),
+                (8313, "Tônico Triplo".to_owned()),
+                (8347, "Perspicácia Cósmica".to_owned()),
+            ]),
+            styles: HashMap::from([
+                (8000, "Precisão".to_owned()),
+                (8300, "Inspiração".to_owned()),
+            ]),
+            summoner_spells: HashMap::from([(4, "Flash".to_owned()), (12, "Teleporte".to_owned())]),
+        }
+    }
+
+    #[test]
+    fn panel_shows_high_elo_header_and_low_sample_warning() {
+        let package: KnowledgePackage =
+            serde_json::from_str(include_str!("../tests/fixtures/knowledge-16.22.json")).unwrap();
+        let entry = package
+            .entries
+            .iter()
+            .find(|entry| entry.champion_id == 1 && entry.position == "ANY")
+            .unwrap();
+        let page = select_page(entry, None);
+        let names = KnowledgeNames::default();
+        let (build, skills) = crate::knowledge::to_recommendations(entry, page);
+
+        let panel = build_view_with_knowledge(
+            &classic(),
+            &catalog(),
+            &build,
+            skills.as_ref(),
+            None,
+            None,
+            Some(HighEloData {
+                package: &package,
+                entry,
+                page,
+                names: &names,
+                player_keystone: None,
+            }),
+        );
+
+        let HighEloSection::Recommendation(high_elo) = panel.high_elo else {
+            panic!("expected high elo recommendation")
+        };
+        assert_eq!(
+            high_elo.header,
+            "Thresh · ANY · elo alto 16.22 (18 partidas, 50%)"
+        );
+        assert!(high_elo.low_sample);
+    }
+
+    #[test]
+    fn panel_without_package_shows_no_data_line() {
+        let panel = build_view(
+            &classic(),
+            &catalog(),
+            &RecommendedBuild::default(),
+            None,
+            None,
+            None,
+        );
+
+        assert_eq!(
+            panel.high_elo,
+            HighEloSection::NoData("Sem dados para este campeão".to_owned())
+        );
+    }
+
+    #[test]
+    fn panel_lists_every_rune_name() {
+        let package: KnowledgePackage =
+            serde_json::from_str(include_str!("../tests/fixtures/knowledge-16.22.json")).unwrap();
+        let entry = package
+            .entries
+            .iter()
+            .find(|entry| entry.champion_id == 145 && entry.position == "BOTTOM")
+            .unwrap();
+        let page = select_page(entry, None);
+        let names = rune_names();
+        let panel = build_view_with_knowledge(
+            &classic(),
+            &catalog(),
+            &RecommendedBuild::default(),
+            None,
+            None,
+            None,
+            Some(HighEloData {
+                package: &package,
+                entry,
+                page,
+                names: &names,
+                player_keystone: None,
+            }),
+        );
+
+        let HighEloSection::Recommendation(view) = panel.high_elo else {
+            panic!("expected high elo recommendation")
+        };
+        assert_eq!(
+            view.primary_style,
+            "Precisão: Ritmo Fatal · Presença de Espírito · Lenda: Linhagem · Dilacerar"
+        );
+        assert_eq!(
+            view.sub_style,
+            "Inspiração: Tônico Triplo · Perspicácia Cósmica"
+        );
+        assert_eq!(
+            view.stat_perks,
+            ["Vel. de ataque", "Força adaptativa", "Vida"]
+        );
+    }
+
+    #[test]
+    fn panel_warns_when_page_or_spells_have_low_sample() {
+        let package: KnowledgePackage =
+            serde_json::from_str(include_str!("../tests/fixtures/knowledge-16.22.json")).unwrap();
+        let mut entry = package
+            .entries
+            .iter()
+            .find(|entry| entry.champion_id == 145 && entry.position == "BOTTOM")
+            .unwrap()
+            .clone();
+        entry.low_sample = false;
+        entry.rune_pages[0].low_sample = true;
+        let names = KnowledgeNames::default();
+        let panel = build_view_with_knowledge(
+            &classic(),
+            &catalog(),
+            &RecommendedBuild::default(),
+            None,
+            None,
+            None,
+            Some(HighEloData {
+                package: &package,
+                entry: &entry,
+                page: Some(&entry.rune_pages[0]),
+                names: &names,
+                player_keystone: None,
+            }),
+        );
+        let HighEloSection::Recommendation(view) = panel.high_elo else {
+            panic!("expected high elo recommendation")
+        };
+        assert!(view.low_sample);
+
+        entry.rune_pages[0].low_sample = false;
+        entry.primary.as_mut().unwrap().summoner_spells_low_sample = true;
+        let panel = build_view_with_knowledge(
+            &classic(),
+            &catalog(),
+            &RecommendedBuild::default(),
+            None,
+            None,
+            None,
+            Some(HighEloData {
+                package: &package,
+                entry: &entry,
+                page: Some(&entry.rune_pages[0]),
+                names: &names,
+                player_keystone: None,
+            }),
+        );
+        let HighEloSection::Recommendation(view) = panel.high_elo else {
+            panic!("expected high elo recommendation")
+        };
+        assert!(view.low_sample);
+    }
+
+    #[test]
+    fn build_path_low_sample_shows_warning() {
+        let package: KnowledgePackage =
+            serde_json::from_str(include_str!("../tests/fixtures/knowledge-16.22.json")).unwrap();
+        let mut entry = package
+            .entries
+            .iter()
+            .find(|entry| entry.champion_id == 145 && entry.position == "BOTTOM")
+            .unwrap()
+            .clone();
+        entry.low_sample = false;
+        entry.rune_pages[0].low_sample = false;
+        entry.primary.as_mut().unwrap().summoner_spells_low_sample = false;
+        entry.rune_pages[0].build_path_low_sample = true;
+        let names = KnowledgeNames::default();
+        let panel = build_view_with_knowledge(
+            &classic(),
+            &catalog(),
+            &RecommendedBuild::default(),
+            None,
+            None,
+            None,
+            Some(HighEloData {
+                package: &package,
+                entry: &entry,
+                page: Some(&entry.rune_pages[0]),
+                names: &names,
+                player_keystone: None,
+            }),
+        );
+
+        let HighEloSection::Recommendation(view) = panel.high_elo else {
+            panic!("expected high elo recommendation")
+        };
+        assert!(view.low_sample);
     }
 
     #[test]

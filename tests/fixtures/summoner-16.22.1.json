@@ -1,0 +1,10 @@
+{
+  "type": "summoner",
+  "version": "16.22.1",
+  "data": {
+    "SummonerExhaust": { "key": "3", "name": "Exaustão" },
+    "SummonerFlash": { "key": "4", "name": "Flash" },
+    "SummonerTeleport": { "key": "12", "name": "Teleporte" },
+    "SummonerBarrier": { "key": "21", "name": "Barreira" }
+  }
+}

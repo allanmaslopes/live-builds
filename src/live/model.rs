@@ -16,6 +16,7 @@ pub struct ActivePlayer {
     pub level: u32,
     pub current_gold: f64,
     pub abilities: AbilityLevels,
+    pub keystone: Option<u32>,
     pub rune_ids: Vec<u32>,
 }
 
@@ -114,6 +115,9 @@ pub fn parse_all_game_data(json: &str) -> Result<GameSnapshot, LiveError> {
             e: ability_level("E"),
             r: ability_level("R"),
         },
+        keystone: active["fullRunes"]["keystone"]["id"]
+            .as_u64()
+            .and_then(|id| u32::try_from(id).ok()),
         rune_ids: active["fullRunes"]["generalRunes"]
             .as_array()
             .into_iter()
@@ -221,6 +225,13 @@ mod tests {
                 .rune_ids
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn parses_active_keystone() {
+        let snapshot = parse_all_game_data(CLASSIC).unwrap();
+
+        assert_eq!(snapshot.active.keystone, Some(8439));
     }
 
     #[test]

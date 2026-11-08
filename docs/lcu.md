@@ -326,3 +326,4 @@ Sonda: `cargo run --example lcu_probe -- --lcu-lockfile <caminho>` (só GET). Fi
 - `PUT /lol-item-sets/v1/item-sets/{summonerId}/sets` com o JSON original + o set do app criou `live-builds — <campeão> <posição>`; os 5 sets do usuário (U.GG/OP.GG) ficaram idênticos byte a byte.
 - Ainda não observados: resposta do cliente com o limite de páginas cheio e a escrita de feitiços em `my-selection`.
 - Partida personalizada com bots: a fase depois de travar dura ~10 s; recomendação e runas precisam aparecer ao escolher o campeão, antes de travar.
+- 2026-11-08 (teste do usuário, partida personalizada): aplicação ao escolher o campeão, 3 opções de runa, feitiços, arsenal e editores funcionaram como esperado. `lcu-snapshot` antes/depois: só a página `live-builds` e o set `live-builds — <campeão> <posição>` mudaram; páginas e sets do usuário intactos. Pendente observar: resposta do cliente com o limite de páginas cheio.

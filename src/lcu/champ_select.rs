@@ -5,6 +5,7 @@ use crate::knowledge::{
 use crate::lcu::item_sets::{ItemSet, from_build};
 use crate::lcu::runes::{RunePageDraft, RuneRules, from_knowledge, from_riot_bin};
 use crate::lcu::{LcuError, LcuHttp};
+use crate::riot_build::RecommendedBuild;
 use crate::settings::Settings;
 use crate::static_data::StaticSource;
 use serde_json::{Value, json};
@@ -12,6 +13,7 @@ use std::time::{Duration, Instant};
 
 const FLASH: u32 = 4;
 const SMITE: u32 = 11;
+const HOVER_DEBOUNCE: Duration = Duration::from_secs(1);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Phase {
@@ -54,21 +56,42 @@ pub fn parse_session(json: &Value, my_cell: i64) -> SelectState {
         team.iter()
             .find(|player| player["cellId"].as_i64() == Some(my_cell))
     });
-    let locked = json["actions"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(Value::as_array)
-        .flatten()
-        .any(|action| {
-            action["actorCellId"].as_i64() == Some(my_cell)
-                && action["type"].as_str() == Some("pick")
-                && action["completed"].as_bool() == Some(true)
-        });
-    let champion_id = player
-        .and_then(|player| player["championId"].as_u64())
-        .and_then(|id| u32::try_from(id).ok())
-        .filter(|id| *id != 0);
+    let id_of = |value: &Value| {
+        value["championId"]
+            .as_u64()
+            .and_then(|id| u32::try_from(id).ok())
+            .filter(|id| *id != 0)
+    };
+    let my_picks = || {
+        json["actions"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_array)
+            .flatten()
+            .filter(|action| {
+                action["actorCellId"].as_i64() == Some(my_cell)
+                    && action["type"].as_str() == Some("pick")
+            })
+    };
+    let locked_pick = my_picks().find(|action| action["completed"].as_bool() == Some(true));
+    let locked = locked_pick.is_some();
+    // travado > pick em andamento (hover) > intenção declarada; o championId do myTeam é o último recurso.
+    let champion_id = locked_pick
+        .and_then(id_of)
+        .or_else(|| locked.then(|| player.and_then(id_of)).flatten())
+        .or_else(|| {
+            my_picks()
+                .find(|action| action["isInProgress"].as_bool() == Some(true))
+                .and_then(id_of)
+        })
+        .or_else(|| {
+            player
+                .and_then(|player| player["championPickIntent"].as_u64())
+                .and_then(|id| u32::try_from(id).ok())
+                .filter(|id| *id != 0)
+        })
+        .or_else(|| player.and_then(id_of));
     let position = player
         .and_then(|player| player["assignedPosition"].as_str())
         .map(normalize_position)
@@ -121,12 +144,43 @@ pub enum Source {
     Riot,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct RuneOption {
+    pub draft: RunePageDraft,
+    pub keystone_name: String,
+    pub games: u32,
+    pub win_rate: f64,
+    pub low_sample: bool,
+    pub source: Source,
+    /// Arsenal montado com o `buildPath` desta página.
+    pub item_set: Option<ItemSet>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct Recommendation {
+    /// Página recomendada ou escolhida (a que o automático e "Aplicar runas" gravam).
     pub page: Option<RunePageDraft>,
     pub spells: (u32, u32),
     pub item_set: Option<ItemSet>,
     pub source: Source,
+    /// Até 3 opções válidas; a de índice 0 é a recomendada.
+    pub pages: Vec<RuneOption>,
+}
+
+impl Recommendation {
+    pub fn can_apply(&self, action: Action) -> bool {
+        action != Action::ItemSet || self.item_set.is_some()
+    }
+
+    /// Troca a página (e o arsenal que segue o `buildPath` dela) pela opção `index`.
+    pub fn choose(&self, index: usize) -> Option<Self> {
+        let option = self.pages.get(index)?;
+        Some(Self {
+            page: Some(option.draft.clone()),
+            item_set: option.item_set.clone(),
+            ..self.clone()
+        })
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -143,52 +197,83 @@ pub fn recommend(
     riot_bin: Option<&str>,
     rune_rules: &RuneRules,
     catalog: &ItemCatalog,
+    names: &KnowledgeNames,
 ) -> Option<Recommendation> {
     let position = normalize_position(position);
     let high_elo = (map_mode.0 == 11 && map_mode.1.eq_ignore_ascii_case("CLASSIC"))
         .then(|| select_entry(package?, champion_id, &position, previous))
         .flatten();
-
-    let (page, spells, build, source) = if let Some(selected) = high_elo {
-        let selected_page = select_page(selected.entry, player_keystone);
-        let page = selected_page
-            .and_then(|page| from_knowledge(page, "live-builds"))
-            .filter(|page| rune_rules.validate(page).is_ok())
-            .or_else(|| {
-                riot_bin
-                    .and_then(|json| from_riot_bin(json, position.as_str(), "live-builds"))
-                    .filter(|page| rune_rules.validate(page).is_ok())
-            });
-        let spells = selected
-            .entry
-            .primary
-            .as_ref()
-            .and_then(|primary| primary.summoner_spells.get(..2))
-            .map(|spells| (spells[0], spells[1]))
-            .unwrap_or_else(|| default_spells(&position));
-        let (build, _) = to_recommendations(selected.entry, selected_page);
-        (page, spells, build, Source::HighElo)
-    } else {
-        let riot_position = if map_mode.1.eq_ignore_ascii_case("CLASSIC") {
-            position.as_str()
-        } else {
-            map_mode.1
-        };
-        let page = riot_bin
-            .and_then(|json| from_riot_bin(json, riot_position, "live-builds"))
-            .filter(|page| rune_rules.validate(page).is_ok());
-        let (build, _) =
-            statics.recommendations(patch, champion, map_mode.0, map_mode.1, riot_position);
-        (page, default_spells(&position), build, Source::Riot)
+    let make_set = |build: &RecommendedBuild| {
+        let set = from_build(champion, champion_id, &position, build, catalog);
+        (!set.blocks.is_empty()).then_some(set)
     };
-    let item_set = from_build(champion, champion_id, &position, &build, catalog);
-    let item_set = (!item_set.blocks.is_empty()).then_some(item_set);
+
+    let (page, pages, spells, item_set, source) =
+        if let Some(selected) = high_elo {
+            let entry = selected.entry;
+            let first = select_page(entry, player_keystone);
+            let pages: Vec<RuneOption> =
+                first
+                    .into_iter()
+                    .chain(entry.rune_pages.iter().filter(|rune_page| {
+                        first.is_none_or(|first| !std::ptr::eq(first, *rune_page))
+                    }))
+                    .filter_map(|rune_page| {
+                        let draft = from_knowledge(rune_page, "live-builds")
+                            .filter(|draft| rune_rules.validate(draft).is_ok())?;
+                        Some(RuneOption {
+                            draft,
+                            keystone_name: names.rune(rune_page.keystone),
+                            games: rune_page.games,
+                            win_rate: rune_page.win_rate,
+                            low_sample: rune_page.low_sample,
+                            source: Source::HighElo,
+                            item_set: make_set(&to_recommendations(entry, Some(rune_page)).0),
+                        })
+                    })
+                    .take(3)
+                    .collect();
+            let (page, item_set) = if let Some(best) = pages.first() {
+                (Some(best.draft.clone()), best.item_set.clone())
+            } else {
+                let page = riot_bin
+                    .and_then(|json| from_riot_bin(json, position.as_str(), "live-builds"))
+                    .filter(|page| rune_rules.validate(page).is_ok());
+                (page, make_set(&to_recommendations(entry, first).0))
+            };
+            let spells = entry
+                .primary
+                .as_ref()
+                .and_then(|primary| primary.summoner_spells.get(..2))
+                .map(|spells| (spells[0], spells[1]))
+                .unwrap_or_else(|| default_spells(&position));
+            (page, pages, spells, item_set, Source::HighElo)
+        } else {
+            let riot_position = if map_mode.1.eq_ignore_ascii_case("CLASSIC") {
+                position.as_str()
+            } else {
+                map_mode.1
+            };
+            let page = riot_bin
+                .and_then(|json| from_riot_bin(json, riot_position, "live-builds"))
+                .filter(|page| rune_rules.validate(page).is_ok());
+            let (build, _) =
+                statics.recommendations(patch, champion, map_mode.0, map_mode.1, riot_position);
+            (
+                page,
+                Vec::new(),
+                default_spells(&position),
+                make_set(&build),
+                Source::Riot,
+            )
+        };
 
     Some(Recommendation {
         page,
         spells,
         item_set,
         source,
+        pages,
     })
 }
 
@@ -222,8 +307,10 @@ pub enum Action {
 #[derive(Default)]
 pub struct Applier {
     key: Option<SelectionKey>,
+    hover: Option<(u32, Instant)>,
     action_states: [ActionState; 3],
     runes_user_edited: bool,
+    choice_made: bool,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -255,15 +342,24 @@ impl Applier {
             *self = Self::default();
             return Vec::new();
         }
-        if !state.locked {
-            return Vec::new();
-        }
         if !state.auto_apply {
             return Vec::new();
         }
         let Some(key) = state.selection_key() else {
             return Vec::new();
         };
+        if !state.locked {
+            let since = match self.hover {
+                Some((champion, since)) if champion == key.champion_id => since,
+                _ => {
+                    self.hover = Some((key.champion_id, now));
+                    now
+                }
+            };
+            if now.saturating_duration_since(since) < HOVER_DEBOUNCE {
+                return Vec::new();
+            }
+        }
         if self.key.as_ref() != Some(&key) {
             if self
                 .key
@@ -273,21 +369,36 @@ impl Applier {
                 self.runes_user_edited = false;
             }
             self.key = Some(key);
+            self.choice_made = false;
             self.action_states = [ActionState::default(); 3];
         }
         self.runes_user_edited |= user_edited;
 
         let mut actions = Vec::new();
-        if settings.auto_runes && !self.runes_user_edited {
+        if settings.auto_runes && !self.runes_user_edited && !self.choice_made {
             self.queue(Action::Runes, now, &mut actions);
         }
         if settings.auto_spells {
             self.queue(Action::Spells, now, &mut actions);
         }
-        if settings.auto_item_set {
+        if settings.auto_item_set && state.locked {
             self.queue(Action::ItemSet, now, &mut actions);
         }
         actions
+    }
+
+    /// Esquece o estado de uma ação para o automático poder refazê-la (ex.: arsenal após trocar a runa).
+    pub fn reset(&mut self, action: Action) {
+        let state = &mut self.action_states[action.index()];
+        *state = ActionState {
+            in_flight: state.in_flight,
+            ..ActionState::default()
+        };
+    }
+
+    /// O usuário escolheu uma opção de runa: o automático não troca mais enquanto o campeão for o mesmo.
+    pub fn mark_choice(&mut self) {
+        self.choice_made = true;
     }
 
     pub fn confirm(&mut self, action: Action, succeeded: bool) {

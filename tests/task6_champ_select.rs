@@ -202,6 +202,7 @@ fn recommendation(page: Option<RunePageDraft>, spells: (u32, u32)) -> Recommenda
             }],
         }),
         source: Source::HighElo,
+        pages: Vec::new(),
     }
 }
 
@@ -399,6 +400,7 @@ fn no_riot_runes_still_returns_spells_and_item_set() {
         Some(include_str!("fixtures/thresh.bin.json")),
         &rules,
         &catalog,
+        &names(),
     )
     .unwrap();
 
@@ -433,6 +435,7 @@ fn aram_uses_riot_recommendation() {
         None,
         &rules,
         &catalog,
+        &names(),
     )
     .unwrap();
 
@@ -470,8 +473,292 @@ fn invalid_package_page_falls_back() {
         None,
         &rules,
         &catalog,
+        &names(),
     )
     .unwrap();
 
     assert!(rec.page.is_none());
+}
+
+fn pick_session(pick: Value, intent: u32) -> Value {
+    json!({
+        "gameId": 10,
+        "localPlayerCellId": 0,
+        "queueId": 420,
+        "myTeam": [{
+            "cellId": 0,
+            "championId": 0,
+            "championPickIntent": intent,
+            "assignedPosition": "jungle",
+            "spell1Id": 4,
+            "spell2Id": 14
+        }],
+        "actions": [[pick]]
+    })
+}
+
+fn hovering(champion_id: u32) -> SelectState {
+    SelectState {
+        locked: false,
+        ..selecting(champion_id)
+    }
+}
+
+#[test]
+fn hover_loads_recommendation_before_lock() {
+    let session = pick_session(
+        json!({"actorCellId": 0, "type": "pick", "championId": 234,
+               "isInProgress": true, "completed": false}),
+        0,
+    );
+
+    let state = parse_session(&session, 0);
+
+    assert_eq!(state.champion_id, Some(234));
+    assert!(!state.locked);
+    assert_eq!(state.selection_key().unwrap().champion_id, 234);
+    let mut tracker = live_builds::ui::SelectionLoadTracker::default();
+    assert!(tracker.should_start(&state, Instant::now()));
+}
+
+#[test]
+fn intent_used_when_no_pick_in_progress() {
+    let idle = json!({"actorCellId": 0, "type": "pick", "championId": 0,
+                      "isInProgress": false, "completed": false});
+    assert_eq!(
+        parse_session(&pick_session(idle.clone(), 145), 0).champion_id,
+        Some(145)
+    );
+    assert_eq!(parse_session(&pick_session(idle, 0), 0).champion_id, None);
+
+    let hovered = json!({"actorCellId": 0, "type": "pick", "championId": 234,
+                         "isInProgress": true, "completed": false});
+    assert_eq!(
+        parse_session(&pick_session(hovered, 145), 0).champion_id,
+        Some(234)
+    );
+    let locked = json!({"actorCellId": 0, "type": "pick", "championId": 99,
+                        "isInProgress": false, "completed": true});
+    let state = parse_session(&pick_session(locked, 145), 0);
+    assert_eq!((state.champion_id, state.locked), (Some(99), true));
+}
+
+#[test]
+fn hover_change_reapplies_after_debounce() {
+    let mut applier = Applier::default();
+    let settings = Settings {
+        auto_runes: true,
+        auto_spells: true,
+        ..Settings::default()
+    };
+    let now = Instant::now();
+    let second = Duration::from_secs(1);
+
+    assert!(
+        applier
+            .on_state_at(&hovering(234), &settings, false, now)
+            .is_empty()
+    );
+    assert!(
+        applier
+            .on_state_at(&hovering(234), &settings, false, now + second / 2)
+            .is_empty()
+    );
+    assert_eq!(
+        applier.on_state_at(&hovering(234), &settings, false, now + second),
+        vec![Action::Runes, Action::Spells]
+    );
+    applier.confirm_at(Action::Runes, true, now + second);
+    applier.confirm_at(Action::Spells, true, now + second);
+
+    let later = now + second * 2;
+    assert!(
+        applier
+            .on_state_at(&hovering(145), &settings, false, later)
+            .is_empty()
+    );
+    assert_eq!(
+        applier.on_state_at(&hovering(145), &settings, false, later + second),
+        vec![Action::Runes, Action::Spells]
+    );
+}
+
+#[test]
+fn item_set_waits_for_lock() {
+    let mut applier = Applier::default();
+    let settings = all_auto();
+    let now = Instant::now();
+    let second = Duration::from_secs(1);
+
+    assert!(
+        applier
+            .on_state_at(&hovering(234), &settings, false, now)
+            .is_empty()
+    );
+    assert_eq!(
+        applier.on_state_at(&hovering(234), &settings, false, now + second),
+        vec![Action::Runes, Action::Spells]
+    );
+    applier.confirm_at(Action::Runes, true, now + second);
+    applier.confirm_at(Action::Spells, true, now + second);
+
+    assert_eq!(
+        applier.on_state_at(&selecting(234), &settings, false, now + second * 2),
+        vec![Action::ItemSet]
+    );
+}
+
+fn five_page_package() -> KnowledgePackage {
+    use live_builds::knowledge::SequenceStats;
+    let mut package: KnowledgePackage =
+        serde_json::from_str(include_str!("fixtures/knowledge-16.22.json")).unwrap();
+    let entry = package
+        .entries
+        .iter_mut()
+        .find(|entry| entry.champion_id == 145 && entry.position == "BOTTOM")
+        .unwrap();
+    let base = entry.rune_pages[0].clone();
+    let variant = |keystone: u32| {
+        let mut page = base.clone();
+        page.keystone = keystone;
+        page.perks[0] = keystone;
+        page.games = 7;
+        page.win_rate = 0.4;
+        page.low_sample = true;
+        page.build_path = Some(SequenceStats {
+            sequence: vec![3302, 3124, 6672],
+        });
+        page
+    };
+    let mut invalid = base.clone();
+    invalid.perks[0] = 999_999;
+    entry.rune_pages = vec![
+        base.clone(),
+        invalid,
+        variant(8005),
+        variant(8021),
+        variant(8010),
+    ];
+    package
+}
+
+fn recommend_kaisa(package: &KnowledgePackage, player_keystone: Option<u32>) -> Recommendation {
+    let cache = tempfile::tempdir().unwrap();
+    let statics = StaticSource::with_fetcher(cache.path().to_path_buf(), |_| Err("offline".into()));
+    let catalog =
+        ItemCatalog::from_ddragon_json("16.22.1", include_str!("fixtures/item_sample.json"))
+            .unwrap();
+    let rules = RuneRules::from_json(include_str!("fixtures/lcu/perks-styles.json")).unwrap();
+    recommend(
+        Some(package),
+        None,
+        &statics,
+        "16.22.1",
+        145,
+        "KaiSa",
+        "BOTTOM",
+        (11, "CLASSIC"),
+        player_keystone,
+        None,
+        &rules,
+        &catalog,
+        &names(),
+    )
+    .unwrap()
+}
+
+#[test]
+fn recommendation_lists_up_to_three_valid_pages() {
+    let package = five_page_package();
+
+    let rec = recommend_kaisa(&package, None);
+
+    let keystones: Vec<_> = rec.pages.iter().map(|o| o.keystone_name.as_str()).collect();
+    assert_eq!(keystones, ["Ritmo Fatal", "Pressione o Ataque", "8021"]);
+    assert_eq!((rec.pages[0].games, rec.pages[0].win_rate), (12, 0.5));
+    assert!(!rec.pages[0].low_sample);
+    assert!(rec.pages[1].low_sample);
+    assert_eq!(rec.pages[0].source, Source::HighElo);
+    assert_eq!(rec.page.as_ref(), Some(&rec.pages[0].draft));
+
+    let rec = recommend_kaisa(&package, Some(8021));
+    assert_eq!(rec.pages[0].draft.perks[0], 8021);
+    assert_eq!(rec.pages.len(), 3);
+}
+
+#[test]
+fn chosen_option_drives_item_set() {
+    let rec = recommend_kaisa(&five_page_package(), None);
+
+    let chosen = rec.choose(1).unwrap();
+
+    assert_eq!(chosen.page.as_ref(), Some(&rec.pages[1].draft));
+    assert_eq!(chosen.item_set, rec.pages[1].item_set);
+    assert_ne!(chosen.item_set, rec.item_set);
+    assert!(
+        chosen
+            .item_set
+            .unwrap()
+            .blocks
+            .iter()
+            .any(|b| b.items.first() == Some(&3302))
+    );
+    assert!(rec.choose(3).is_none());
+}
+
+#[test]
+fn manual_choice_does_not_disable_auto_for_next_champion() {
+    let mut applier = Applier::default();
+    let settings = Settings {
+        auto_runes: true,
+        ..Settings::default()
+    };
+
+    assert_eq!(
+        applier.on_state(&selecting(234), &settings, false),
+        vec![Action::Runes]
+    );
+    applier.confirm(Action::Runes, true);
+    applier.mark_choice();
+    applier.reset(Action::Runes);
+    assert!(
+        applier
+            .on_state(&selecting(234), &settings, false)
+            .is_empty()
+    );
+
+    assert_eq!(
+        applier.on_state(&selecting(145), &settings, false),
+        vec![Action::Runes]
+    );
+}
+
+#[test]
+fn reset_keeps_in_flight_action() {
+    let mut applier = Applier::default();
+    let settings = Settings {
+        auto_item_set: true,
+        ..Settings::default()
+    };
+    assert_eq!(
+        applier.on_state(&selecting(234), &settings, false),
+        vec![Action::ItemSet]
+    );
+
+    applier.reset(Action::ItemSet);
+
+    assert!(
+        applier
+            .on_state(&selecting(234), &settings, false)
+            .is_empty()
+    );
+}
+
+#[test]
+fn recommendation_without_item_set_cannot_apply_it() {
+    let mut rec = recommendation(None, (4, 11));
+    assert!(rec.can_apply(Action::ItemSet));
+    rec.item_set = None;
+    assert!(!rec.can_apply(Action::ItemSet));
+    assert!(rec.can_apply(Action::Spells));
 }

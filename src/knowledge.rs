@@ -47,6 +47,10 @@ pub struct RunePage {
     pub sub_style: u32,
     pub perks: Vec<u32>,
     pub stat_perks: Option<StatPerks>,
+    #[serde(default)]
+    pub games: u32,
+    #[serde(default)]
+    pub win_rate: f64,
     pub low_sample: bool,
     pub build_path: Option<SequenceStats>,
     #[serde(default)]

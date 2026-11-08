@@ -32,6 +32,7 @@ fn recommendation() -> Recommendation {
             }],
         }),
         source: Source::HighElo,
+        pages: Vec::new(),
     }
 }
 
@@ -82,6 +83,7 @@ fn select_screen_shows_source_and_reminder() {
             spells: false,
             item_set: true,
         },
+        chosen: None,
         limit_reached: true,
         settings_corrupted: true,
         loading: false,
@@ -392,4 +394,50 @@ fn refresh_keeps_dirty_draft_but_save_replaces_it() {
 
     editors.replace_lists(pages, sets, true, false);
     assert_eq!(editors.page_draft.as_ref().unwrap().draft.name, "A");
+}
+
+#[test]
+fn options_mark_chosen_by_index_and_hide_empty_stats() {
+    let mut rec = recommendation();
+    let option = |keystone: u32, games: u32| live_builds::lcu::champ_select::RuneOption {
+        draft: RunePageDraft {
+            perks: [keystone, 8009, 9103, 3035, 8139, 8135, 5005, 5008, 5011],
+            ..rec.page.clone().unwrap()
+        },
+        keystone_name: keystone.to_string(),
+        games,
+        win_rate: 0.5,
+        low_sample: false,
+        source: Source::HighElo,
+        item_set: None,
+    };
+    rec.pages = vec![option(8005, 12), option(8010, 0)];
+    let view = |chosen| {
+        select_screen(SelectScreenInput {
+            champion: "Kai'Sa",
+            position: "BOTTOM",
+            recommendation: Some(&rec),
+            source_patch: None,
+            source_games: None,
+            names: &names(),
+            item_names: &|id| id.to_string(),
+            differences: &[],
+            applied: AppliedItems::default(),
+            chosen,
+            limit_reached: false,
+            settings_corrupted: false,
+            loading: false,
+            error: None,
+        })
+    };
+
+    let none = view(None);
+    assert!(none.options.iter().all(|option| !option.chosen));
+    let second = view(Some(1));
+    assert_eq!(
+        second.options.iter().map(|o| o.chosen).collect::<Vec<_>>(),
+        [false, true]
+    );
+    assert_eq!(second.options[0].detail, "12 partidas · 50.0% vitória");
+    assert_eq!(second.options[1].detail, "");
 }

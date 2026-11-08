@@ -319,3 +319,10 @@ Sonda: `cargo run --example lcu_probe -- --lcu-lockfile <caminho>` (só GET). Fi
 - **Limite de páginas:** `/lol-perks/v1/customizationlimits` não existe (404). Usar `GET /lol-perks/v1/inventory` → `{canAddCustomPage, customPageCount, isCustomPageCreationUnlocked, ownedPageCount}`.
 - **Arsenais:** `GET /lol-item-sets/v1/item-sets/{summonerId}/sets` funciona → `{accountId, itemSets[], timestamp}`; cada set: `uid`, `title`, `associatedChampions[]`, `associatedMaps[]`, `blocks[]`, `map`, `mode`, `type` (`custom`), `sortrank`, `startedFrom`, `preferredItemSlots`. `lol-loadouts` também responde, mas não é necessário para item sets.
 - **Convivência:** o usuário tem o Blitz importando runas (página "Blitz: …" ativa) e arsenais do U.GG/OP.GG. O app não toca neles; com dois importadores automáticos ligados, um pode desfazer o outro.
+
+### 6.1 Escrita confirmada no cliente real (2026-11-08, partida personalizada)
+
+- `POST /lol-perks/v1/pages` com `{name, primaryStyleId, subStyleId, selectedPerkIds[9], current: true}` criou a página `live-builds` e a deixou ativa; a página do Blitz ficou idêntica (só `current` passou a `false`).
+- `PUT /lol-item-sets/v1/item-sets/{summonerId}/sets` com o JSON original + o set do app criou `live-builds — <campeão> <posição>`; os 5 sets do usuário (U.GG/OP.GG) ficaram idênticos byte a byte.
+- Ainda não observados: resposta do cliente com o limite de páginas cheio e a escrita de feitiços em `my-selection`.
+- Partida personalizada com bots: a fase depois de travar dura ~10 s; recomendação e runas precisam aparecer ao escolher o campeão, antes de travar.

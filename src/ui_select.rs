@@ -19,10 +19,19 @@ pub struct SelectScreenInput<'a> {
     pub item_names: &'a dyn Fn(u32) -> String,
     pub differences: &'a [String],
     pub applied: AppliedItems,
+    pub chosen: Option<usize>,
     pub limit_reached: bool,
     pub settings_corrupted: bool,
     pub loading: bool,
     pub error: Option<&'a str>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuneOptionView {
+    pub title: String,
+    pub detail: String,
+    pub low_sample: bool,
+    pub chosen: bool,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -32,6 +41,7 @@ pub struct SelectScreenView {
     pub runes: Vec<String>,
     pub spells: String,
     pub item_set: Vec<String>,
+    pub options: Vec<RuneOptionView>,
     pub can_apply_runes: bool,
     pub can_apply_spells: bool,
     pub can_apply_item_set: bool,
@@ -66,6 +76,25 @@ pub fn select_screen(input: SelectScreenInput<'_>) -> SelectScreenView {
         },
         Source::Riot => "Riot".to_owned(),
     };
+    view.options = recommendation
+        .pages
+        .iter()
+        .enumerate()
+        .map(|(index, option)| RuneOptionView {
+            title: option.keystone_name.clone(),
+            detail: if option.games == 0 {
+                String::new()
+            } else {
+                format!(
+                    "{} partidas · {:.1}% vitória",
+                    option.games,
+                    option.win_rate * 100.0
+                )
+            },
+            low_sample: option.low_sample,
+            chosen: input.chosen == Some(index),
+        })
+        .collect();
     if let Some(page) = &recommendation.page {
         view.runes.push(format!(
             "{} · {}",
@@ -130,6 +159,7 @@ pub enum SelectAction {
     ApplyRunes,
     ApplySpells,
     ApplyItemSet,
+    ChooseOption(usize),
 }
 
 pub fn draw(ctx: &egui::Context, view: &SelectScreenView) -> Option<SelectAction> {
@@ -148,6 +178,23 @@ pub fn draw(ctx: &egui::Context, view: &SelectScreenView) -> Option<SelectAction
                 .clicked()
             {
                 action = Some(SelectAction::ApplyRunes);
+            }
+            for (index, option) in view.options.iter().enumerate() {
+                columns[0].separator();
+                columns[0].label(RichText::new(&option.title).strong());
+                if !option.detail.is_empty() {
+                    columns[0].label(&option.detail);
+                }
+                if option.low_sample {
+                    columns[0].label(
+                        RichText::new("⚠ poucas partidas").color(Color32::from_rgb(240, 190, 80)),
+                    );
+                }
+                if option.chosen {
+                    columns[0].label(RichText::new("✓ escolhida").color(Color32::LIGHT_GREEN));
+                } else if columns[0].button("Usar esta").clicked() {
+                    action = Some(SelectAction::ChooseOption(index));
+                }
             }
             columns[1].heading("Feitiços");
             columns[1].label(&view.spells);

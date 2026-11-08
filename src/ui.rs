@@ -196,6 +196,8 @@ struct SelectionUi {
     applied: AppliedItems,
     limit_reached: bool,
     applied_page: Option<crate::lcu::runes::RunePageDraft>,
+    /// Índice da opção de runa que o usuário escolheu (só `choose_option` define).
+    chosen: Option<usize>,
     user_edited: bool,
     observed_page: Option<crate::lcu::runes::RunePageDraft>,
     observed_spells: (u32, u32),
@@ -246,12 +248,30 @@ impl SelectionUi {
         self.recalculate_differences(names);
     }
 
+    /// O usuário escolheu uma opção de runa: vale como edição dele (o automático não troca mais).
+    fn choose_option(&mut self, index: usize, names: &KnowledgeNames) -> bool {
+        let Some(chosen) = self.recommendation.choose(index) else {
+            return false;
+        };
+        self.recommendation = chosen;
+        self.chosen = Some(index);
+        self.applied.item_set = false;
+        self.recalculate_differences(names);
+        true
+    }
+
     /// Recarga com a mesma chave (troca de patch) não pode esquecer o que já foi aplicado.
     fn inherit(&mut self, old: SelectionUi) {
         self.applied = old.applied;
         self.applied_page = old.applied_page;
         self.user_edited = old.user_edited;
         self.stale_page = old.stale_page;
+        if let Some(index) = old.chosen
+            && let Some(chosen) = self.recommendation.choose(index)
+        {
+            self.recommendation = chosen;
+            self.chosen = Some(index);
+        }
     }
 
     fn recalculate_differences(&mut self, names: &KnowledgeNames) {
@@ -506,6 +526,7 @@ fn load_selection(
         riot_bin.as_deref(),
         &rules,
         &data.catalog,
+        &data.knowledge_names,
     )
     .ok_or_else(|| "nenhuma recomendação disponível".to_owned())?;
     let selected = package.as_ref().and_then(|loaded| {
@@ -538,6 +559,7 @@ fn load_selection(
             limit_reached: false,
             applied_page: None,
             user_edited: false,
+            chosen: None,
             observed_page: active.map(|page| page.draft),
             observed_spells: state.spells,
             stale_page: None,
@@ -863,7 +885,15 @@ impl App {
                 .on_state_at(state, &self.settings, selection.user_edited, now)
         });
         for action in actions {
-            self.apply_selection(action);
+            let wanted = self
+                .selection
+                .as_ref()
+                .is_some_and(|data| data.recommendation.can_apply(action));
+            if wanted {
+                self.apply_selection(action);
+            } else {
+                self.applier.confirm(action, true);
+            }
         }
         let fallback = state.champion_id.map_or_else(
             || "Escolha um campeão".to_owned(),
@@ -884,17 +914,31 @@ impl App {
             },
             differences: selection.map_or(&[], |data| data.differences.as_slice()),
             applied: selection.map_or_else(AppliedItems::default, |data| data.applied),
+            chosen: selection.and_then(|data| data.chosen),
             limit_reached: selection.is_some_and(|data| data.limit_reached),
             settings_corrupted: self.settings.corrupted,
             loading: self.selection_load.is_loading(state),
             error: self.selection_error.as_deref(),
         });
-        if let Some(action) = crate::ui_select::draw(ctx, &view) {
-            self.apply_selection(match action {
-                SelectAction::ApplyRunes => Action::Runes,
-                SelectAction::ApplySpells => Action::Spells,
-                SelectAction::ApplyItemSet => Action::ItemSet,
-            });
+        match crate::ui_select::draw(ctx, &view) {
+            Some(SelectAction::ApplyRunes) => self.apply_selection(Action::Runes),
+            Some(SelectAction::ApplySpells) => self.apply_selection(Action::Spells),
+            Some(SelectAction::ApplyItemSet) => self.apply_selection(Action::ItemSet),
+            Some(SelectAction::ChooseOption(index)) => self.choose_option(index),
+            None => {}
+        }
+    }
+
+    fn choose_option(&mut self, index: usize) {
+        if self
+            .selection
+            .as_mut()
+            .is_some_and(|selection| selection.choose_option(index, &self.names))
+        {
+            self.applier.mark_choice();
+            // o arsenal segue a página escolhida; o automático o refaz se estiver ligado
+            self.applier.reset(Action::ItemSet);
+            self.apply_selection(Action::Runes);
         }
     }
 
@@ -1177,6 +1221,7 @@ mod tests {
             spells: (4, 11),
             item_set: None,
             source: Source::Riot,
+            pages: Vec::new(),
         };
 
         let applied = apply_recommendation(&http, &key, Action::Spells, &recommendation).unwrap();
@@ -1234,6 +1279,7 @@ mod tests {
             spells: (4, 11),
             item_set: None,
             source: Source::Riot,
+            pages: Vec::new(),
         };
         let settings = Settings {
             auto_spells: true,
@@ -1278,6 +1324,7 @@ mod tests {
             spells: (4, 11),
             item_set: None,
             source: Source::Riot,
+            pages: Vec::new(),
         };
         let key = SelectionKey {
             session_id: "10".to_owned(),
@@ -1295,6 +1342,7 @@ mod tests {
             limit_reached: false,
             applied_page: Some(wanted.clone()),
             user_edited: false,
+            chosen: None,
             observed_page: Some(wanted.clone()),
             observed_spells: (4, 11),
             stale_page: None,
@@ -1350,6 +1398,7 @@ mod tests {
                 spells: (4, 11),
                 item_set: None,
                 source: Source::Riot,
+                pages: Vec::new(),
             },
             source_patch: None,
             source_games: None,
@@ -1358,6 +1407,7 @@ mod tests {
             limit_reached: false,
             applied_page: None,
             user_edited: false,
+            chosen: None,
             observed_page: Some(previous.clone()),
             observed_spells: (4, 11),
             stale_page: None,
@@ -1423,6 +1473,7 @@ mod tests {
             spells: (4, 11),
             item_set: None,
             source: Source::Riot,
+            pages: Vec::new(),
         };
 
         let (applied, changed) =
@@ -1452,6 +1503,7 @@ mod tests {
                 spells: (4, 11),
                 item_set: None,
                 source: Source::Riot,
+                pages: Vec::new(),
             },
             source_patch: None,
             source_games: None,
@@ -1460,6 +1512,7 @@ mod tests {
             limit_reached: false,
             applied_page: None,
             user_edited: false,
+            chosen: None,
             observed_page: None,
             observed_spells: (4, 11),
             stale_page: None,
@@ -1474,6 +1527,186 @@ mod tests {
 
         assert!(fresh.applied.runes && fresh.user_edited);
         assert_eq!(fresh.applied_page, Some(page));
+    }
+
+    struct RecordingHttp {
+        writes: RefCell<Vec<(String, String, Value)>>,
+    }
+
+    impl LcuHttp for RecordingHttp {
+        fn get(&self, path: &str) -> Result<Value, LcuError> {
+            Ok(match path {
+                "/lol-champ-select/v1/session" => json!({
+                    "gameId": 10, "localPlayerCellId": 0, "queueId": 420,
+                    "myTeam": [{"cellId": 0, "championId": 234,
+                                "assignedPosition": "jungle", "spell1Id": 4, "spell2Id": 14}],
+                    "actions": []
+                }),
+                "/lol-perks/v1/pages" => json!([{
+                    "id": 7, "name": "live-builds", "isEditable": true, "isTemporary": false,
+                    "current": true, "primaryStyleId": 8000, "subStyleId": 8100,
+                    "selectedPerkIds": [8005, 8009, 9103, 3035, 8139, 8135, 5005, 5008, 5011]
+                }]),
+                other => panic!("GET inesperado: {other}"),
+            })
+        }
+
+        fn send(&self, method: &str, path: &str, body: &Value) -> Result<Value, LcuError> {
+            self.writes
+                .borrow_mut()
+                .push((method.to_owned(), path.to_owned(), body.clone()));
+            Ok(Value::Null)
+        }
+    }
+
+    #[test]
+    fn choosing_option_writes_app_page_and_stops_auto() {
+        let option = |keystone: u32| crate::lcu::champ_select::RuneOption {
+            draft: RunePageDraft {
+                name: "live-builds".to_owned(),
+                primary_style: 8000,
+                sub_style: 8100,
+                perks: [keystone, 8009, 9103, 3035, 8139, 8135, 5005, 5008, 5011],
+            },
+            keystone_name: keystone.to_string(),
+            games: 10,
+            win_rate: 0.5,
+            low_sample: false,
+            source: Source::HighElo,
+            item_set: None,
+        };
+        let recommendation = Recommendation {
+            page: Some(option(8005).draft),
+            spells: (4, 11),
+            item_set: None,
+            source: Source::HighElo,
+            pages: vec![option(8005), option(8010)],
+        };
+        let key = SelectionKey {
+            session_id: "10".to_owned(),
+            champion_id: 234,
+            position: "JUNGLE".to_owned(),
+        };
+        let mut selection = SelectionUi {
+            key: key.clone(),
+            champion: "Viego".to_owned(),
+            recommendation,
+            source_patch: None,
+            source_games: None,
+            differences: Vec::new(),
+            applied: AppliedItems::default(),
+            limit_reached: false,
+            applied_page: None,
+            user_edited: false,
+            chosen: None,
+            observed_page: None,
+            observed_spells: (4, 11),
+            stale_page: None,
+        };
+
+        let names = KnowledgeNames::default();
+        assert!(selection.choose_option(1, &names));
+        assert!(!selection.choose_option(5, &names));
+        assert_eq!(selection.chosen, Some(1));
+        let http = RecordingHttp {
+            writes: RefCell::new(Vec::new()),
+        };
+        let applied =
+            apply_recommendation(&http, &key, Action::Runes, &selection.recommendation).unwrap();
+
+        assert_eq!(applied, Some(true));
+        let writes = http.writes.borrow();
+        assert!(writes.iter().all(|(method, _, _)| method != "DELETE"));
+        let (_, path, body) = writes
+            .iter()
+            .find(|(method, _, _)| method == "PUT")
+            .unwrap();
+        assert_eq!(path, "/lol-perks/v1/pages/7");
+        assert_eq!(body["selectedPerkIds"][0], 8010);
+        assert_eq!(body["name"], "live-builds");
+        assert!(!selection.user_edited);
+        let state = SelectState {
+            phase: crate::lcu::champ_select::Phase::ChampSelect,
+            session_id: "10".to_owned(),
+            champion_id: Some(234),
+            locked: true,
+            position: "JUNGLE".to_owned(),
+            spells: (4, 11),
+            map_mode: (11, "CLASSIC".to_owned()),
+            auto_apply: true,
+            active_page: None,
+        };
+        let auto = Settings {
+            auto_runes: true,
+            ..Settings::default()
+        };
+        let mut applier = Applier::default();
+        applier.on_state(&state, &auto, false);
+        applier.mark_choice();
+        applier.reset(Action::Runes);
+        assert!(
+            !applier
+                .on_state(&state, &auto, selection.user_edited)
+                .contains(&Action::Runes)
+        );
+    }
+
+    #[test]
+    fn reload_reapplies_only_explicit_choice() {
+        let option = |keystone: u32| crate::lcu::champ_select::RuneOption {
+            draft: RunePageDraft {
+                name: "live-builds".to_owned(),
+                primary_style: 8000,
+                sub_style: 8100,
+                perks: [keystone, 8009, 9103, 3035, 8139, 8135, 5005, 5008, 5011],
+            },
+            keystone_name: keystone.to_string(),
+            games: 10,
+            win_rate: 0.5,
+            low_sample: false,
+            source: Source::HighElo,
+            item_set: None,
+        };
+        let make = |page: u32| SelectionUi {
+            key: SelectionKey {
+                session_id: "10".to_owned(),
+                champion_id: 234,
+                position: "JUNGLE".to_owned(),
+            },
+            champion: "Viego".to_owned(),
+            recommendation: Recommendation {
+                page: Some(option(page).draft),
+                spells: (4, 11),
+                item_set: None,
+                source: Source::HighElo,
+                pages: vec![option(8005), option(8010)],
+            },
+            source_patch: None,
+            source_games: None,
+            differences: Vec::new(),
+            applied: AppliedItems::default(),
+            limit_reached: false,
+            applied_page: None,
+            user_edited: true,
+            chosen: None,
+            observed_page: None,
+            observed_spells: (4, 11),
+            stale_page: None,
+        };
+        let names = KnowledgeNames::default();
+
+        let mut unchosen_old = make(8010);
+        let mut fresh = make(8005);
+        fresh.inherit(unchosen_old);
+        assert_eq!(fresh.chosen, None);
+        assert_eq!(fresh.recommendation.page, Some(option(8005).draft));
+
+        unchosen_old = make(8005);
+        assert!(unchosen_old.choose_option(1, &names));
+        let mut fresh = make(8005);
+        fresh.inherit(unchosen_old);
+        assert_eq!(fresh.chosen, Some(1));
+        assert_eq!(fresh.recommendation.page, Some(option(8010).draft));
     }
 
     #[test]

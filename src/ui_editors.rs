@@ -189,7 +189,22 @@ pub fn draw_rune_tree(
     icons: &HashMap<String, egui::TextureHandle>,
 ) -> bool {
     let before = draft.clone();
-    ui.label("Árvore primária");
+    ui.set_min_width(ui.available_width());
+    ui.columns(2, |columns| {
+        draw_primary_tree(&mut columns[0], rules, draft, names, icons);
+        draw_secondary_tree(&mut columns[1], rules, draft, names, icons);
+    });
+    *draft != before
+}
+
+fn draw_primary_tree(
+    ui: &mut egui::Ui,
+    rules: &RuneRules,
+    draft: &mut RunePageDraft,
+    names: &KnowledgeNames,
+    icons: &HashMap<String, egui::TextureHandle>,
+) {
+    ui.heading("Árvore primária");
     ui.horizontal_wrapped(|ui| {
         for style in rules.style_ids() {
             let name = names.style(style);
@@ -199,6 +214,8 @@ pub fn draw_rune_tree(
                 &name,
                 names.style_icon(style),
                 icons,
+                32.0,
+                style_color(style),
             ) {
                 select_primary_style(rules, draft, style);
             }
@@ -214,12 +231,23 @@ pub fn draw_rune_tree(
                     &name,
                     names.rune_icon(perk),
                     icons,
+                    if slot == 0 { 64.0 } else { 48.0 },
+                    style_color(draft.primary_style),
                 ) {
                     select_tree_perk(rules, draft, TreeRow::Primary(slot), perk);
                 }
             }
         });
     }
+}
+
+fn draw_secondary_tree(
+    ui: &mut egui::Ui,
+    rules: &RuneRules,
+    draft: &mut RunePageDraft,
+    names: &KnowledgeNames,
+    icons: &HashMap<String, egui::TextureHandle>,
+) {
     ui.label("Árvore secundária");
     ui.horizontal_wrapped(|ui| {
         for style in rules.allowed_sub_styles(draft.primary_style) {
@@ -230,23 +258,27 @@ pub fn draw_rune_tree(
                 &name,
                 names.style_icon(style),
                 icons,
+                28.0,
+                style_color(style),
             ) {
                 select_secondary_style(rules, draft, style);
             }
         }
     });
-    for index in 0..2 {
+    for slot in 1..=3 {
         ui.horizontal_wrapped(|ui| {
-            for perk in tree_row_options(rules, draft, TreeRow::Secondary(index)) {
+            for perk in rules.slot_perks(draft.sub_style, slot) {
                 let name = names.rune(perk);
                 if rune_icon_button(
                     ui,
-                    draft.perks[index + 4] == perk,
+                    draft.perks[4..6].contains(&perk),
                     &name,
                     names.rune_icon(perk),
                     icons,
+                    48.0,
+                    style_color(draft.sub_style),
                 ) {
-                    select_tree_perk(rules, draft, TreeRow::Secondary(index), perk);
+                    select_secondary_perk(rules, draft, slot, perk);
                 }
             }
         });
@@ -267,13 +299,32 @@ pub fn draw_rune_tree(
                     &name,
                     names.rune_icon(perk),
                     icons,
+                    32.0,
+                    style_color(draft.primary_style),
                 ) {
                     select_tree_perk(rules, draft, TreeRow::Shard(index), perk);
                 }
             }
         });
     }
-    *draft != before
+}
+
+fn select_secondary_perk(
+    rules: &RuneRules,
+    draft: &mut RunePageDraft,
+    slot: usize,
+    perk: u32,
+) -> bool {
+    if !rules.slot_perks(draft.sub_style, slot).contains(&perk) || draft.perks[4..6].contains(&perk)
+    {
+        return false;
+    }
+    let index = draft.perks[4..6]
+        .iter()
+        .position(|selected| rules.regular_slot_of(draft.sub_style, *selected) == Some(slot))
+        .map_or(4, |index| index + 4);
+    draft.perks[index] = perk;
+    true
 }
 
 fn rune_icon_button(
@@ -282,27 +333,48 @@ fn rune_icon_button(
     name: &str,
     icon_path: Option<&str>,
     icons: &HashMap<String, egui::TextureHandle>,
+    size: f32,
+    color: egui::Color32,
 ) -> bool {
+    let tint = if selected {
+        color
+    } else {
+        egui::Color32::from_gray(105)
+    };
+    let stroke = if selected {
+        egui::Stroke::new(2.0_f32, egui::Color32::from_rgb(218, 165, 32))
+    } else {
+        egui::Stroke::NONE
+    };
     if let Some(texture) = icon_path.and_then(|path| icons.get(path)) {
-        let tint = if selected {
-            egui::Color32::WHITE
-        } else {
-            egui::Color32::from_gray(105)
-        };
         ui.add(
             egui::Button::image(
                 egui::Image::new(texture)
-                    .fit_to_exact_size(egui::vec2(36.0, 36.0))
+                    .fit_to_exact_size(egui::vec2(size, size))
                     .tint(tint),
             )
-            .selected(selected),
+            .stroke(stroke),
         )
         .on_hover_text(name)
         .clicked()
     } else {
-        ui.selectable_label(selected, icon_label(name, None))
-            .on_hover_text(name)
-            .clicked()
+        ui.add(
+            egui::Button::new(egui::RichText::new(icon_label(name, None)).color(tint))
+                .stroke(stroke),
+        )
+        .on_hover_text(name)
+        .clicked()
+    }
+}
+
+fn style_color(style: u32) -> egui::Color32 {
+    match style {
+        8000 => egui::Color32::from_rgb(240, 190, 80),
+        8100 => egui::Color32::from_rgb(210, 80, 80),
+        8200 => egui::Color32::from_rgb(95, 155, 240),
+        8300 => egui::Color32::from_rgb(100, 210, 215),
+        8400 => egui::Color32::from_rgb(100, 185, 110),
+        _ => egui::Color32::WHITE,
     }
 }
 
@@ -603,47 +675,49 @@ pub fn draw(
         });
     });
     egui::CentralPanel::default().show(ctx, |ui| {
-        if state.discard.is_some() {
-            ui.colored_label(egui::Color32::LIGHT_RED, "Descartar alterações?");
-            ui.horizontal(|ui| {
-                if ui.button("Descartar").clicked() {
-                    state.confirm_discard();
-                }
-                if ui.button("Continuar editando").clicked() {
-                    state.discard = None;
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            if state.discard.is_some() {
+                ui.colored_label(egui::Color32::LIGHT_RED, "Descartar alterações?");
+                ui.horizontal(|ui| {
+                    if ui.button("Descartar").clicked() {
+                        state.confirm_discard();
+                    }
+                    if ui.button("Continuar editando").clicked() {
+                        state.discard = None;
+                    }
+                });
+                ui.separator();
+            }
+            state.sync_confirmations();
+            ui.add_enabled_ui(enabled, |ui| match state.tab {
+                EditorTab::Runes => draw_runes(ui, state, names, icons, &mut actions),
+                EditorTab::ItemSets => draw_sets(ui, state, catalog, &mut actions),
+                EditorTab::Settings => {
+                    ui.heading("Configurações");
+                    let changed = ui
+                        .checkbox(&mut settings.auto_runes, "Aplicar runas automaticamente")
+                        .changed()
+                        | ui.checkbox(
+                            &mut settings.auto_spells,
+                            "Aplicar feitiços automaticamente",
+                        )
+                        .changed()
+                        | ui.checkbox(
+                            &mut settings.auto_item_set,
+                            "Aplicar arsenal automaticamente",
+                        )
+                        .changed();
+                    if changed {
+                        actions.push(EditorAction::SaveSettings);
+                    }
+                    if settings.corrupted {
+                        ui.colored_label(
+                            egui::Color32::LIGHT_RED,
+                            "As configurações estavam corrompidas; revise e salve novamente.",
+                        );
+                    }
                 }
             });
-            ui.separator();
-        }
-        state.sync_confirmations();
-        ui.add_enabled_ui(enabled, |ui| match state.tab {
-            EditorTab::Runes => draw_runes(ui, state, names, icons, &mut actions),
-            EditorTab::ItemSets => draw_sets(ui, state, catalog, &mut actions),
-            EditorTab::Settings => {
-                ui.heading("Configurações");
-                let changed = ui
-                    .checkbox(&mut settings.auto_runes, "Aplicar runas automaticamente")
-                    .changed()
-                    | ui.checkbox(
-                        &mut settings.auto_spells,
-                        "Aplicar feitiços automaticamente",
-                    )
-                    .changed()
-                    | ui.checkbox(
-                        &mut settings.auto_item_set,
-                        "Aplicar arsenal automaticamente",
-                    )
-                    .changed();
-                if changed {
-                    actions.push(EditorAction::SaveSettings);
-                }
-                if settings.corrupted {
-                    ui.colored_label(
-                        egui::Color32::LIGHT_RED,
-                        "As configurações estavam corrompidas; revise e salve novamente.",
-                    );
-                }
-            }
         });
     });
     actions
@@ -1036,5 +1110,41 @@ mod tests {
         assert!(text.iter().any(|value| value == "Força adaptativa"));
         assert!(text.iter().any(|value| value == "Vida"));
         assert!(text.iter().any(|value| value == "Ritmo Fatal"));
+    }
+
+    #[test]
+    fn layout_uses_available_width() {
+        let rules =
+            RuneRules::from_json(include_str!("../tests/fixtures/lcu/perks-styles.json")).unwrap();
+        let names = KnowledgeNames::default();
+        let render_width = |width| {
+            let context = egui::Context::default();
+            let _ = context.run(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(width, 900.0),
+                    )),
+                    ..Default::default()
+                },
+                |ctx| {
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        let mut draft = new_page(&rules).unwrap();
+                        let mut tree_width = 0.0;
+                        ui.scope(|ui| {
+                            draw_rune_tree(ui, &rules, &mut draft, &names, &HashMap::new());
+                            tree_width = ui.min_rect().width();
+                        });
+                        ui.data_mut(|data| {
+                            data.insert_temp(egui::Id::new("tree width"), tree_width)
+                        });
+                    });
+                },
+            );
+            context.data_mut(|data| data.get_temp::<f32>(egui::Id::new("tree width")).unwrap())
+        };
+
+        assert!(render_width(1_000.0) > 900.0);
+        assert!(render_width(1_000.0) > render_width(400.0));
     }
 }

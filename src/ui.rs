@@ -2298,22 +2298,34 @@ mod tests {
 impl App {
     /// Draws layout B; returns the enemy champion the user clicked, if any.
     fn panel(&self, ctx: &egui::Context, view: &PanelView) -> Option<String> {
-        egui::TopBottomPanel::top("high_elo").show(ctx, |ui| high_elo(ui, &view.high_elo));
-        egui::TopBottomPanel::bottom("lane").show(ctx, |ui| lane(ui, view.lane.as_ref()));
+        egui::TopBottomPanel::top("high_elo").show(ctx, |ui| {
+            egui::ScrollArea::vertical().show(ui, |ui| high_elo(ui, &view.high_elo));
+        });
+        egui::TopBottomPanel::bottom("lane").show(ctx, |ui| {
+            egui::ScrollArea::vertical().show(ui, |ui| lane(ui, view.lane.as_ref()));
+        });
         egui::SidePanel::left("me")
             .exact_width(330.0)
             .resizable(false)
-            .show(ctx, |ui| me(ui, &view.me, &view.skills));
+            .show(ctx, |ui| {
+                egui::ScrollArea::vertical().show(ui, |ui| me(ui, &view.me, &view.skills));
+            });
         let picked = egui::SidePanel::right("teams")
             .exact_width(420.0)
             .resizable(false)
-            .show(ctx, |ui| teams(ui, &view.teams, view.lane.as_ref()))
+            .show(ctx, |ui| {
+                egui::ScrollArea::vertical()
+                    .show(ui, |ui| teams(ui, &view.teams, view.lane.as_ref()))
+                    .inner
+            })
             .inner;
         egui::CentralPanel::default().show(ctx, |ui| {
-            if let Some(note) = &view.catalog_note {
-                ui.label(RichText::new(note).color(WARN));
-            }
-            build(ui, &view.build, view.me.gold);
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                if let Some(note) = &view.catalog_note {
+                    ui.label(RichText::new(note).color(WARN));
+                }
+                build(ui, &view.build, view.me.gold);
+            });
         });
         picked
     }

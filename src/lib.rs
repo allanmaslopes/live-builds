@@ -76,7 +76,7 @@ pub fn run() -> eframe::Result {
         // Not focused on start: the window must never steal focus from the game.
         viewport: egui::ViewportBuilder::default()
             .with_title("live-builds")
-            .with_inner_size([1280.0, 720.0])
+            .with_inner_size([1280.0, 1000.0])
             .with_active(false),
         ..Default::default()
     };

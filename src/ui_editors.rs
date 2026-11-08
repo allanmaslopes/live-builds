@@ -706,6 +706,11 @@ pub fn draw(
                             &mut settings.auto_item_set,
                             "Aplicar arsenal automaticamente",
                         )
+                        .changed()
+                        | ui.checkbox(
+                            &mut settings.exclusive_item_set,
+                            "Arsenal exclusivo: apagar os outros arsenais do campeão ao aplicar",
+                        )
                         .changed();
                     if changed {
                         actions.push(EditorAction::SaveSettings);

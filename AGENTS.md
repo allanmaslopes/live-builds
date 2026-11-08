@@ -29,7 +29,7 @@ Scripts de rotina em `D:\Workspace\Scripts\yoursummoner` (ver `README.md` lá): 
 
 ## Invariantes (nunca quebrar)
 
-1. **Dados do usuário:** só tocar a página de runas `live-builds` e os arsenais `live-builds-*`. Ao gravar no cliente, partir do JSON original e alterar só o necessário; nunca reserializar com um modelo incompleto. Nada é apagado sem confirmação do usuário (exceto o que ele ligou explicitamente, como o arsenal exclusivo).
+1. **Dados do usuário:** só tocar a página de runas `live-builds` e os arsenais `live-builds-*`. Ao gravar no cliente, partir do JSON original e alterar só o necessário; nunca reserializar com um modelo incompleto. Nada é apagado sem confirmação do usuário. Exceções decididas pelo usuário (não são violação): o **arsenal exclusivo** (`exclusive_item_set`, padrão **ligado**) apaga os arsenais de outros apps do mesmo campeão ao gravar o nosso; os **arquivos globais** de outros apps (`Config\Global\Recommended\*.json`, ex. Blitz) são apagados só com confirmação explícita da lista exata.
 2. **Assíncrono:** todo comando e resultado do worker carrega a chave da seleção e uma geração; resultado de chave/geração antiga é descartado. Nada de I/O na thread da UI.
 3. **Dados externos** (LCU, Live Client, Data Dragon, Community Dragon, processor): nunca `unwrap`/`expect`; erro vira fallback ou mensagem na tela.
 4. **Produto:** sempre há recomendação (elo alto → Riot → aviso "sem recomendação"). Aplicação automática só em Summoner's Rift (ranqueada, normal, personalizada).

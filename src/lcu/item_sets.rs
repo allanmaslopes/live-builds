@@ -2,6 +2,9 @@ use crate::catalog::ItemCatalog;
 use crate::lcu::{LcuError, LcuHttp};
 use crate::riot_build::RecommendedBuild;
 use serde_json::{Value, json};
+use std::fs;
+use std::io;
+use std::path::{Path, PathBuf};
 
 const CURRENT_SUMMONER: &str = "/lol-summoner/v1/current-summoner";
 
@@ -73,6 +76,14 @@ pub fn list_sets(http: &dyn LcuHttp) -> Result<Vec<ItemSet>, LcuError> {
 
 /// Troca/insere só o set do app (por `uid`); o resto do GET volta intacto no PUT.
 pub fn upsert_app_set(http: &dyn LcuHttp, item_set: &ItemSet) -> Result<(), LcuError> {
+    upsert_app_set_with_exclusive(http, item_set, false)
+}
+
+pub fn upsert_app_set_with_exclusive(
+    http: &dyn LcuHttp,
+    item_set: &ItemSet,
+    exclusive: bool,
+) -> Result<(), LcuError> {
     let path = sets_path(http)?;
     let mut response = http.get(&path)?;
     let sets = response["itemSets"]
@@ -91,9 +102,67 @@ pub fn upsert_app_set(http: &dyn LcuHttp, item_set: &ItemSet) -> Result<(), LcuE
         app_set["priority"] = json!(true);
         sets.push(app_set);
     }
+    if exclusive {
+        let champion_id = item_set.champion_ids.first().copied();
+        sets.retain(|set| {
+            set["uid"].as_str() == Some(item_set.uid.as_str())
+                || champion_id.is_none_or(|id| {
+                    !set["associatedChampions"]
+                        .as_array()
+                        .is_some_and(|champions| {
+                            champions
+                                .iter()
+                                .any(|value| value.as_u64() == Some(u64::from(id)))
+                        })
+                })
+        });
+    }
 
     http.send("PUT", &path, &response)?;
     Ok(())
+}
+
+pub fn list_global_item_set_files(lockfile: &Path) -> io::Result<Vec<PathBuf>> {
+    let mut files = fs::read_dir(global_recommended_dir(lockfile))?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.is_file()
+                && path
+                    .extension()
+                    .is_some_and(|extension| extension.eq_ignore_ascii_case("json"))
+        })
+        .collect::<Vec<_>>();
+    files.sort();
+    Ok(files)
+}
+
+pub fn delete_global_item_set_files(lockfile: &Path, confirmed: &[PathBuf]) -> io::Result<()> {
+    let directory = global_recommended_dir(lockfile);
+    for path in confirmed {
+        let valid_path = path.parent() == Some(directory.as_path())
+            && path.is_file()
+            && path
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("json"));
+        if !valid_path {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "arquivo confirmado fora da pasta de arsenais globais",
+            ));
+        }
+        fs::remove_file(path)?;
+    }
+    Ok(())
+}
+
+fn global_recommended_dir(lockfile: &Path) -> PathBuf {
+    lockfile
+        .parent()
+        .unwrap_or(lockfile)
+        .join("Config")
+        .join("Global")
+        .join("Recommended")
 }
 
 /// Salva somente o arsenal indicado e devolve todo o restante do documento sem alterações.
@@ -286,6 +355,7 @@ mod tests {
     use crate::lcu::LcuHttp;
     use crate::riot_build::ItemStage;
     use std::cell::RefCell;
+    use std::fs;
 
     struct RecordingHttp {
         responses: RefCell<Vec<Value>>,
@@ -399,7 +469,7 @@ mod tests {
             blocks: vec![],
         };
 
-        upsert_app_set(&http, &app_set).unwrap();
+        upsert_app_set_with_exclusive(&http, &app_set, false).unwrap();
 
         let body = http.put_body.into_inner().unwrap();
         let sets = body["itemSets"].as_array().unwrap();
@@ -407,5 +477,158 @@ mod tests {
         assert_eq!(sets[0]["priority"], true);
         assert_eq!(sets[1]["sortrank"], 0);
         assert_eq!(sets[1]["priority"], false);
+    }
+
+    #[test]
+    fn exclusive_removes_other_sets_of_same_champion() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/lcu/item-sets.json")).unwrap();
+        let http = RecordingHttp::new(vec![json!({"summonerId": 7}), fixture]);
+        let app_set = ItemSet {
+            uid: "live-builds-202-MIDDLE".to_owned(),
+            title: "live-builds — Jhin MIDDLE".to_owned(),
+            champion_ids: vec![202],
+            blocks: vec![],
+        };
+
+        upsert_app_set_with_exclusive(&http, &app_set, true).unwrap();
+
+        let sets = http.put_body.into_inner().unwrap()["itemSets"]
+            .as_array()
+            .unwrap()
+            .clone();
+        assert!(!sets.iter().any(|set| set["uid"] == "set-5"));
+        assert!(sets.iter().any(|set| set["uid"] == app_set.uid));
+        for uid in ["set-1", "set-2", "set-3", "set-4"] {
+            assert!(sets.iter().any(|set| set["uid"] == uid), "{uid} sumiu");
+        }
+        assert_eq!(sets.len(), 5);
+    }
+
+    #[test]
+    fn exclusive_keeps_other_champions_and_global_sets() {
+        let mut fixture: Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/lcu/item-sets.json")).unwrap();
+        let global =
+            json!({"uid": "global", "associatedChampions": [], "unchanged": {"x": [1, 2]}});
+        fixture["itemSets"]
+            .as_array_mut()
+            .unwrap()
+            .push(global.clone());
+        let original_other = fixture["itemSets"][0].clone();
+        let http = RecordingHttp::new(vec![json!({"summonerId": 7}), fixture]);
+        let app_set = ItemSet {
+            uid: "live-builds-202-MIDDLE".to_owned(),
+            title: "live-builds — Jhin MIDDLE".to_owned(),
+            champion_ids: vec![202],
+            blocks: vec![],
+        };
+
+        upsert_app_set_with_exclusive(&http, &app_set, true).unwrap();
+
+        let sets = http.put_body.into_inner().unwrap()["itemSets"]
+            .as_array()
+            .unwrap()
+            .clone();
+        assert!(sets.contains(&original_other));
+        assert!(sets.contains(&global));
+    }
+
+    #[test]
+    fn exclusive_off_keeps_everything() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/lcu/item-sets.json")).unwrap();
+        let original = fixture["itemSets"].clone();
+        let http = RecordingHttp::new(vec![json!({"summonerId": 7}), fixture]);
+        let app_set = ItemSet {
+            uid: "live-builds-202-MIDDLE".to_owned(),
+            title: "live-builds — Jhin MIDDLE".to_owned(),
+            champion_ids: vec![202],
+            blocks: vec![],
+        };
+
+        upsert_app_set_with_exclusive(&http, &app_set, false).unwrap();
+
+        let sets = http.put_body.into_inner().unwrap()["itemSets"].clone();
+        let sets = sets.as_array().unwrap();
+        let original = original.as_array().unwrap();
+        assert_eq!(sets.len(), original.len() + 1);
+        for set in original {
+            assert!(sets.contains(set));
+        }
+    }
+
+    #[test]
+    fn lists_global_item_set_files() {
+        let directory = tempfile::tempdir().unwrap();
+        let lockfile = directory.path().join("lockfile");
+        let recommended = directory.path().join("Config/Global/Recommended");
+        fs::create_dir_all(&recommended).unwrap();
+        fs::write(recommended.join("!!!blitz-234.json"), "{}").unwrap();
+        fs::write(recommended.join("notes.txt"), "keep").unwrap();
+
+        let files = list_global_item_set_files(&lockfile).unwrap();
+
+        assert_eq!(files, vec![recommended.join("!!!blitz-234.json")]);
+    }
+
+    #[test]
+    fn deleting_global_sets_requires_confirmation() {
+        let directory = tempfile::tempdir().unwrap();
+        let lockfile = directory.path().join("lockfile");
+        let recommended = directory.path().join("Config/Global/Recommended");
+        fs::create_dir_all(&recommended).unwrap();
+        let file = recommended.join("!!!blitz-234.json");
+        fs::write(&file, "{}").unwrap();
+
+        delete_global_item_set_files(&lockfile, &[]).unwrap();
+
+        assert!(file.exists());
+    }
+
+    #[test]
+    fn deleting_confirmed_global_sets_only_removes_listed_files() {
+        let directory = tempfile::tempdir().unwrap();
+        let lockfile = directory.path().join("lockfile");
+        let recommended = directory.path().join("Config/Global/Recommended");
+        fs::create_dir_all(&recommended).unwrap();
+        let targeted = recommended.join("!!!blitz-234.json");
+        let not_confirmed = recommended.join("opgg.json");
+        let text = recommended.join("keep.txt");
+        let outside = directory.path().join("outside.json");
+        fs::write(&targeted, "{}").unwrap();
+        fs::write(&not_confirmed, "{}").unwrap();
+        fs::write(&text, "keep").unwrap();
+        fs::write(&outside, "keep").unwrap();
+
+        delete_global_item_set_files(&lockfile, std::slice::from_ref(&targeted)).unwrap();
+
+        assert!(!targeted.exists());
+        assert!(not_confirmed.exists());
+        assert!(text.exists());
+        assert!(outside.exists());
+
+        let error =
+            delete_global_item_set_files(&lockfile, std::slice::from_ref(&outside)).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+        assert!(outside.exists());
+    }
+
+    #[test]
+    fn global_delete_does_not_remove_file_created_after_confirmation() {
+        let directory = tempfile::tempdir().unwrap();
+        let lockfile = directory.path().join("lockfile");
+        let recommended = directory.path().join("Config/Global/Recommended");
+        fs::create_dir_all(&recommended).unwrap();
+        let confirmed = recommended.join("!!!blitz-234.json");
+        let later = recommended.join("!!!blitz-145.json");
+        fs::write(&confirmed, "{}").unwrap();
+        let files = list_global_item_set_files(&lockfile).unwrap();
+        fs::write(&later, "{}").unwrap();
+
+        delete_global_item_set_files(&lockfile, &files).unwrap();
+
+        assert!(!confirmed.exists());
+        assert!(later.exists());
     }
 }

@@ -25,6 +25,8 @@ pub struct SelectScreenInput<'a> {
     pub chosen: Option<usize>,
     pub limit_reached: bool,
     pub settings_corrupted: bool,
+    pub global_item_set_files: &'a [String],
+    pub global_delete_confirmation: bool,
     pub loading: bool,
     pub error: Option<&'a str>,
 }
@@ -54,6 +56,8 @@ pub struct SelectScreenView {
     pub differences: Vec<String>,
     pub limit_message: Option<String>,
     pub settings_warning: Option<String>,
+    pub global_item_set_files: Vec<String>,
+    pub global_delete_confirmation: bool,
     pub error: Option<String>,
 }
 
@@ -144,6 +148,8 @@ pub fn select_screen(input: SelectScreenInput<'_>) -> SelectScreenView {
 
 fn add_notices(mut view: SelectScreenView, input: &SelectScreenInput<'_>) -> SelectScreenView {
     view.error = input.error.map(str::to_owned);
+    view.global_item_set_files = input.global_item_set_files.to_vec();
+    view.global_delete_confirmation = input.global_delete_confirmation;
     if !view.differences.is_empty() {
         view.reminder_title = Some("Confira feitiços e runas".to_owned());
     }
@@ -166,6 +172,9 @@ pub enum SelectAction {
     ApplyItemSet,
     ChooseOption(usize),
     EditRunes(RunePageDraft),
+    RequestDeleteGlobalItemSets,
+    ConfirmDeleteGlobalItemSets,
+    CancelDeleteGlobalItemSets,
 }
 
 pub fn rune_apply_enabled(
@@ -262,6 +271,29 @@ pub fn draw(
             if !view.applied.is_empty() {
                 ui.separator();
                 ui.label(view.applied.join("   "));
+            }
+            if !view.global_item_set_files.is_empty() {
+                ui.separator();
+                ui.label(format!(
+                    "Há {} arsenais globais de outros apps (Blitz/OP.GG) para apagar",
+                    view.global_item_set_files.len()
+                ));
+                if view.global_delete_confirmation {
+                    ui.colored_label(Color32::LIGHT_RED, "Não dá para desfazer");
+                    for name in &view.global_item_set_files {
+                        ui.label(name);
+                    }
+                    ui.horizontal(|ui| {
+                        if ui.button("Confirmar exclusão").clicked() {
+                            action = Some(SelectAction::ConfirmDeleteGlobalItemSets);
+                        }
+                        if ui.button("Cancelar").clicked() {
+                            action = Some(SelectAction::CancelDeleteGlobalItemSets);
+                        }
+                    });
+                } else if ui.button("Apagar arsenais globais").clicked() {
+                    action = Some(SelectAction::RequestDeleteGlobalItemSets);
+                }
             }
             if let Some(title) = &view.reminder_title {
                 ui.separator();

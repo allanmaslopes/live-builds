@@ -87,6 +87,8 @@ fn select_screen_shows_source_and_reminder() {
         chosen: None,
         limit_reached: true,
         settings_corrupted: true,
+        global_item_set_files: &[],
+        global_delete_confirmation: false,
         loading: false,
         error: None,
     });
@@ -427,6 +429,8 @@ fn options_mark_chosen_by_index_and_hide_empty_stats() {
             chosen,
             limit_reached: false,
             settings_corrupted: false,
+            global_item_set_files: &[],
+            global_delete_confirmation: false,
             loading: false,
             error: None,
         })

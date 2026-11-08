@@ -3,7 +3,11 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+fn default_exclusive_item_set() -> bool {
+    true
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Settings {
     #[serde(default)]
     pub auto_runes: bool,
@@ -11,8 +15,22 @@ pub struct Settings {
     pub auto_spells: bool,
     #[serde(default)]
     pub auto_item_set: bool,
+    #[serde(default = "default_exclusive_item_set")]
+    pub exclusive_item_set: bool,
     #[serde(skip)]
     pub corrupted: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            auto_runes: false,
+            auto_spells: false,
+            auto_item_set: false,
+            exclusive_item_set: default_exclusive_item_set(),
+            corrupted: false,
+        }
+    }
 }
 
 impl Settings {

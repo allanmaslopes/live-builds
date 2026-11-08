@@ -36,6 +36,7 @@ fn all_auto() -> Settings {
         auto_runes: true,
         auto_spells: true,
         auto_item_set: true,
+        exclusive_item_set: true,
         corrupted: false,
     }
 }
@@ -259,17 +260,40 @@ fn reminder_flags_missing_smite_in_jungle() {
 fn settings_default_all_off_and_roundtrip() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("nested/settings.json");
-    assert_eq!(Settings::load(&path), Settings::default());
+    let defaults = Settings::load(&path);
+    assert!(!defaults.auto_runes);
+    assert!(!defaults.auto_spells);
+    assert!(!defaults.auto_item_set);
+    assert!(defaults.exclusive_item_set);
 
     let wanted = Settings {
         auto_runes: true,
         auto_spells: false,
         auto_item_set: true,
+        exclusive_item_set: true,
         corrupted: false,
     };
     wanted.save(&path).unwrap();
 
     assert_eq!(Settings::load(&path), wanted);
+}
+
+#[test]
+fn settings_without_exclusive_item_set_default_to_enabled() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("settings.json");
+    std::fs::write(
+        &path,
+        r#"{"auto_runes":true,"auto_spells":true,"auto_item_set":true}"#,
+    )
+    .unwrap();
+
+    let loaded = Settings::load(&path);
+
+    assert!(loaded.auto_runes);
+    assert!(loaded.auto_spells);
+    assert!(loaded.auto_item_set);
+    assert!(loaded.exclusive_item_set);
 }
 
 #[test]

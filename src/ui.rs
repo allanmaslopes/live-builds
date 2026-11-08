@@ -4,8 +4,10 @@ use crate::lcu::champ_select::{
     Action, Applier, Recommendation, SelectState, SelectionKey, parse_session, recommend, reminder,
     set_spells,
 };
-use crate::lcu::item_sets::upsert_app_set;
 use crate::lcu::item_sets::{create_user_set, delete_user_set, list_sets, save_user_set};
+use crate::lcu::item_sets::{
+    delete_global_item_set_files, list_global_item_set_files, upsert_app_set_with_exclusive,
+};
 use crate::lcu::perks::{
     ApplyOutcome, create_page, delete_page, list_pages, update_page, upsert_app_page,
 };
@@ -158,6 +160,9 @@ pub struct App {
     selection_error: Option<String>,
     select_autosave: SelectAutosave,
     icons: IconLoader,
+    global_delete_confirmation: bool,
+    confirmed_global_item_set_files: Vec<PathBuf>,
+    selection_generation: u64,
 }
 
 #[derive(Default)]
@@ -278,6 +283,7 @@ struct SelectionUi {
     /// Page the client showed before our apply; a poll still reading it is stale, not a user edit.
     stale_page: Option<crate::lcu::runes::RunePageDraft>,
     rules: Option<RuneRules>,
+    global_item_set_files: Vec<PathBuf>,
 }
 
 struct IconLoader {
@@ -541,10 +547,16 @@ enum UiCommand {
         key: SelectionKey,
         action: Action,
         recommendation: Recommendation,
+        exclusive_item_set: bool,
     },
     SaveSelectionRunes {
         key: SelectionKey,
         draft: RunePageDraft,
+    },
+    DeleteGlobalItemSets {
+        key: SelectionKey,
+        generation: u64,
+        files: Vec<PathBuf>,
     },
     Editor {
         generation: u64,
@@ -579,6 +591,11 @@ enum UiResult {
         reset_page: bool,
         reset_set: bool,
         selection_session: Option<String>,
+    },
+    GlobalItemSetsDeleted {
+        key: SelectionKey,
+        generation: u64,
+        result: Result<(), String>,
     },
 }
 
@@ -645,11 +662,22 @@ impl UiWorker {
                         key,
                         action,
                         recommendation,
+                        exclusive_item_set,
                     } => {
                         let checked = connect_lcu(lockfile.as_deref())
                             .map_err(|error| error.to_string())
                             .and_then(|http| {
-                                apply_and_verify(&http, &key, action, &recommendation)
+                                if exclusive_item_set {
+                                    apply_and_verify_with_exclusive(
+                                        &http,
+                                        &key,
+                                        action,
+                                        &recommendation,
+                                        true,
+                                    )
+                                } else {
+                                    apply_and_verify(&http, &key, action, &recommendation)
+                                }
                             });
                         let (result, selection_changed) = match checked {
                             Ok((applied, changed)) => (Ok(applied), changed),
@@ -683,6 +711,30 @@ impl UiWorker {
                             key,
                             result,
                             selection_changed,
+                        }
+                    }
+                    UiCommand::DeleteGlobalItemSets {
+                        key,
+                        generation,
+                        files,
+                    } => {
+                        let result = connect_lcu(lockfile.as_deref())
+                            .map_err(|error| error.to_string())
+                            .and_then(|http| {
+                                if session_key(&http)?.as_ref() != Some(&key) {
+                                    return Err(SELECTION_CHANGED.to_owned());
+                                }
+                                find_lockfile(lockfile.as_deref())
+                                    .ok_or_else(|| "cliente do LoL fechado".to_owned())
+                                    .and_then(|path| {
+                                        delete_global_item_set_files(&path, &files)
+                                            .map_err(|error| error.to_string())
+                                    })
+                            });
+                        UiResult::GlobalItemSetsDeleted {
+                            key,
+                            generation,
+                            result,
                         }
                     }
                     UiCommand::Editor {
@@ -833,6 +885,9 @@ fn load_selection(
             observed_spells: state.spells,
             stale_page: None,
             rules: Some(rules),
+            global_item_set_files: find_lockfile(lockfile)
+                .and_then(|path| list_global_item_set_files(&path).ok())
+                .unwrap_or_default(),
         },
     })
 }
@@ -873,6 +928,19 @@ fn apply_and_verify(
     Ok((applied, changed))
 }
 
+fn apply_and_verify_with_exclusive(
+    http: &dyn LcuHttp,
+    key: &SelectionKey,
+    action: Action,
+    recommendation: &Recommendation,
+    exclusive_item_set: bool,
+) -> Result<(Option<bool>, bool), String> {
+    let applied =
+        apply_recommendation_with_exclusive(http, key, action, recommendation, exclusive_item_set)?;
+    let changed = applied.is_some() && session_key(http)?.as_ref() != Some(key);
+    Ok((applied, changed))
+}
+
 fn session_key(http: &dyn LcuHttp) -> Result<Option<SelectionKey>, String> {
     let session = http
         .get("/lol-champ-select/v1/session")
@@ -888,6 +956,16 @@ fn apply_recommendation(
     key: &SelectionKey,
     action: Action,
     recommendation: &Recommendation,
+) -> Result<Option<bool>, String> {
+    apply_recommendation_with_exclusive(http, key, action, recommendation, false)
+}
+
+fn apply_recommendation_with_exclusive(
+    http: &dyn LcuHttp,
+    key: &SelectionKey,
+    action: Action,
+    recommendation: &Recommendation,
+    exclusive_item_set: bool,
 ) -> Result<Option<bool>, String> {
     if session_key(http)?.as_ref() != Some(key) {
         return Ok(None);
@@ -910,7 +988,7 @@ fn apply_recommendation(
                 .item_set
                 .as_ref()
                 .ok_or_else(|| "sem recomendação de arsenal".to_owned())?;
-            upsert_app_set(http, set)
+            upsert_app_set_with_exclusive(http, set, exclusive_item_set)
                 .map(|_| true)
                 .map_err(|error| error.to_string())
         }
@@ -1055,6 +1133,9 @@ impl App {
             selection_error: None,
             select_autosave: SelectAutosave::default(),
             icons,
+            global_delete_confirmation: false,
+            confirmed_global_item_set_files: Vec::new(),
+            selection_generation: 0,
         }
     }
 }
@@ -1118,6 +1199,8 @@ impl App {
         self.applier = Applier::default();
         self.selection_error = None;
         self.select_autosave = SelectAutosave::default();
+        self.global_delete_confirmation = false;
+        self.confirmed_global_item_set_files.clear();
     }
 
     fn select(&mut self, ctx: &egui::Context, lcu: &LcuPollState) {
@@ -1226,6 +1309,13 @@ impl App {
             chosen: selection.and_then(|data| data.chosen),
             limit_reached: selection.is_some_and(|data| data.limit_reached),
             settings_corrupted: self.settings.corrupted,
+            global_item_set_files: &selection.map_or_else(Vec::new, |data| {
+                data.global_item_set_files
+                    .iter()
+                    .filter_map(|path| path.file_name()?.to_str().map(str::to_owned))
+                    .collect()
+            }),
+            global_delete_confirmation: self.global_delete_confirmation,
             loading: self.selection_load.is_loading(state),
             error: self.selection_error.as_deref(),
         });
@@ -1247,6 +1337,32 @@ impl App {
             Some(SelectAction::ApplyItemSet) => self.apply_selection(Action::ItemSet),
             Some(SelectAction::ChooseOption(index)) => self.choose_option(index),
             Some(SelectAction::EditRunes(draft)) => self.edit_selection_runes(draft, now),
+            Some(SelectAction::RequestDeleteGlobalItemSets) => {
+                self.global_delete_confirmation = true;
+                self.confirmed_global_item_set_files = self
+                    .selection
+                    .as_ref()
+                    .map(|selection| selection.global_item_set_files.clone())
+                    .unwrap_or_default();
+            }
+            Some(SelectAction::CancelDeleteGlobalItemSets) => {
+                self.global_delete_confirmation = false;
+                self.confirmed_global_item_set_files.clear();
+            }
+            Some(SelectAction::ConfirmDeleteGlobalItemSets) => {
+                self.global_delete_confirmation = false;
+                let Some(selection) = self.selection.as_ref() else {
+                    return;
+                };
+                let command = UiCommand::DeleteGlobalItemSets {
+                    key: selection.key.clone(),
+                    generation: self.selection_generation,
+                    files: std::mem::take(&mut self.confirmed_global_item_set_files),
+                };
+                if let Err(error) = self.ui_worker.send(command) {
+                    self.selection_error = Some(error);
+                }
+            }
             None => {}
         }
     }
@@ -1316,6 +1432,7 @@ impl App {
             key,
             action,
             recommendation,
+            exclusive_item_set: self.settings.exclusive_item_set,
         }) {
             self.applier.confirm_at(action, false, Instant::now());
             self.selection_error = Some(error);
@@ -1394,6 +1511,7 @@ impl App {
                                 fresh.inherit(old);
                             }
                             self.selection = Some(fresh);
+                            self.selection_generation = self.selection_generation.wrapping_add(1);
                             self.selection_load.succeeded();
                             self.next_patch_check = Instant::now() + Duration::from_secs(60);
                         }
@@ -1527,6 +1645,25 @@ impl App {
                             self.editors.loaded = true;
                             self.editors.status = Some(format!("Não foi possível salvar: {error}"));
                         }
+                    }
+                }
+                UiResult::GlobalItemSetsDeleted {
+                    key,
+                    generation,
+                    result,
+                } => {
+                    if generation != self.selection_generation
+                        || self.selection.as_ref().map(|selection| &selection.key) != Some(&key)
+                    {
+                        continue;
+                    }
+                    match result {
+                        Ok(()) => {
+                            if let Some(selection) = &mut self.selection {
+                                selection.global_item_set_files.clear();
+                            }
+                        }
+                        Err(error) => self.selection_error = Some(error),
                     }
                 }
             }
@@ -1722,6 +1859,69 @@ mod tests {
         assert!(http.writes.borrow().is_empty());
     }
 
+    #[test]
+    fn ui_default_item_set_apply_does_not_enable_exclusive_mode() {
+        struct ItemSetHttp {
+            responses: RefCell<Vec<Value>>,
+            writes: RefCell<Vec<Value>>,
+        }
+
+        impl LcuHttp for ItemSetHttp {
+            fn get(&self, _path: &str) -> Result<Value, LcuError> {
+                Ok(self.responses.borrow_mut().remove(0))
+            }
+
+            fn send(&self, _method: &str, _path: &str, body: &Value) -> Result<Value, LcuError> {
+                self.writes.borrow_mut().push(body.clone());
+                Ok(Value::Null)
+            }
+        }
+
+        let key = SelectionKey {
+            session_id: "10".to_owned(),
+            champion_id: 234,
+            position: "JUNGLE".to_owned(),
+        };
+        let session = json!({
+            "gameId": 10, "localPlayerCellId": 0, "queueId": 420,
+            "myTeam": [{"cellId": 0, "championId": 234, "assignedPosition": "jungle",
+                        "spell1Id": 4, "spell2Id": 14}], "actions": []
+        });
+        let other_app = json!({
+            "uid": "other-app-234", "associatedChampions": [234], "blocks": []
+        });
+        let http = ItemSetHttp {
+            responses: RefCell::new(vec![
+                session,
+                json!({"summonerId": 7}),
+                json!({"itemSets": [other_app.clone()]}),
+            ]),
+            writes: RefCell::new(Vec::new()),
+        };
+        let recommendation = Recommendation {
+            page: None,
+            spells: (4, 11),
+            item_set: Some(crate::lcu::item_sets::ItemSet {
+                uid: "live-builds-234-JUNGLE".to_owned(),
+                title: "live-builds — Viego JUNGLE".to_owned(),
+                champion_ids: vec![234],
+                blocks: Vec::new(),
+            }),
+            source: Source::Riot,
+            pages: Vec::new(),
+        };
+
+        let applied = apply_recommendation(&http, &key, Action::ItemSet, &recommendation).unwrap();
+
+        assert_eq!(applied, Some(true));
+        assert!(
+            http.writes.borrow()[0]["itemSets"]
+                .as_array()
+                .unwrap()
+                .contains(&other_app)
+        );
+    }
+
     struct TransientHttp {
         attempts: Cell<u8>,
     }
@@ -1840,6 +2040,7 @@ mod tests {
             observed_spells: (4, 11),
             stale_page: None,
             rules: None,
+            global_item_set_files: Vec::new(),
         };
         let mut edited = wanted;
         edited.perks[0] = 8008;
@@ -1907,6 +2108,7 @@ mod tests {
             observed_spells: (4, 11),
             stale_page: None,
             rules: None,
+            global_item_set_files: Vec::new(),
         };
         let state = SelectState {
             phase: crate::lcu::champ_select::Phase::ChampSelect,
@@ -2014,6 +2216,7 @@ mod tests {
             observed_spells: (4, 11),
             stale_page: None,
             rules: None,
+            global_item_set_files: Vec::new(),
         };
         let mut old = make();
         old.applied.runes = true;
@@ -2062,6 +2265,7 @@ mod tests {
             observed_spells: (4, 11),
             stale_page: None,
             rules: None,
+            global_item_set_files: Vec::new(),
         };
         let mut old = make(page.clone());
         old.user_edited = true;
@@ -2150,6 +2354,7 @@ mod tests {
             observed_spells: (4, 11),
             stale_page: None,
             rules: None,
+            global_item_set_files: Vec::new(),
         };
 
         let names = KnowledgeNames::default();
@@ -2242,6 +2447,7 @@ mod tests {
             observed_spells: (4, 11),
             stale_page: None,
             rules: None,
+            global_item_set_files: Vec::new(),
         };
         let names = KnowledgeNames::default();
 

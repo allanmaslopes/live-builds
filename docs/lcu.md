@@ -318,7 +318,8 @@ Sonda: `cargo run --example lcu_probe -- --lcu-lockfile <caminho>` (só GET). Fi
 - **Runas:** `GET /lol-perks/v1/pages` (campos `id`, `name`, `isEditable`, `isDeletable`, `isActive`, `current`, `primaryStyleId`, `subStyleId`, `selectedPerkIds` [6 runas + 3 fragmentos], `isTemporary`, `isRecommendationOverride`, …); `GET /lol-perks/v1/currentpage` igual a uma página. `GET /lol-perks/v1/styles` traz as árvores e slots.
 - **Limite de páginas:** `/lol-perks/v1/customizationlimits` não existe (404). Usar `GET /lol-perks/v1/inventory` → `{canAddCustomPage, customPageCount, isCustomPageCreationUnlocked, ownedPageCount}`.
 - **Arsenais:** `GET /lol-item-sets/v1/item-sets/{summonerId}/sets` funciona → `{accountId, itemSets[], timestamp}`; cada set: `uid`, `title`, `associatedChampions[]`, `associatedMaps[]`, `blocks[]`, `map`, `mode`, `type` (`custom`), `sortrank`, `startedFrom`, `preferredItemSlots`. `lol-loadouts` também responde, mas não é necessário para item sets.
-- **Convivência:** o usuário tem o Blitz importando runas (página "Blitz: …" ativa) e arsenais do U.GG/OP.GG. O app não toca neles; com dois importadores automáticos ligados, um pode desfazer o outro.
+- **Arsenal exclusivo:** a configuração `exclusive_item_set` começa ligada. Ao aplicar o arsenal do live-builds, o PUT preserva o JSON original dos sets que ficam, mas remove os sets de outros apps associados ao mesmo campeão; sets de outros campeões e sets globais (sem campeão) não mudam.
+- **Arsenais globais em arquivo:** Blitz/OP.GG podem gravar `<pasta do lockfile>\Config\Global\Recommended\*.json`, que aparecem antes do live-builds. O app só lista esses arquivos e oferece apagá-los mediante confirmação explícita; a exclusão toca apenas os `.json` dessa pasta e o outro app pode recriá-los.
 
 ### 6.1 Escrita confirmada no cliente real (2026-11-08, partida personalizada)
 

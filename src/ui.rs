@@ -328,6 +328,20 @@ impl IconLoader {
         }
     }
 
+    fn prepare_items(&mut self, build: &BuildView, patch: &str) {
+        for id in build
+            .items
+            .iter()
+            .map(|item| item.id)
+            .chain(build.affordable_now_ids.iter().copied())
+        {
+            let key = item_icon_key(patch, id);
+            if self.requested.insert(key.clone()) && self.commands.send(key).is_err() {
+                break;
+            }
+        }
+    }
+
     fn drain(&mut self, ctx: &egui::Context) {
         while let Ok((path, result)) = self.results.try_recv() {
             if let Ok(decoded) = result {
@@ -398,16 +412,28 @@ where
 
 fn load_rune_icon(cache_dir: &Path, icon: &str) -> Result<crate::ui_editors::DecodedIcon, String> {
     load_rune_icon_with(cache_dir, icon, || {
-        let mut response = ureq::get(&format!(
-            "https://ddragon.leagueoflegends.com/cdn/img/{icon}"
-        ))
-        .config()
-        .timeout_global(Some(Duration::from_secs(10)))
-        .build()
-        .call()
-        .map_err(|error| error.to_string())?;
+        let url = icon
+            .strip_prefix("item/")
+            .and_then(|item| {
+                let (patch, id) = item.split_once('/')?;
+                id.parse::<u32>().ok()?;
+                Some(format!(
+                    "https://ddragon.leagueoflegends.com/cdn/{patch}/img/item/{id}.png"
+                ))
+            })
+            .unwrap_or_else(|| format!("https://ddragon.leagueoflegends.com/cdn/img/{icon}"));
+        let mut response = ureq::get(&url)
+            .config()
+            .timeout_global(Some(Duration::from_secs(10)))
+            .build()
+            .call()
+            .map_err(|error| error.to_string())?;
         read_icon_bytes(response.body_mut().as_reader())
     })
+}
+
+fn item_icon_key(patch: &str, id: u32) -> String {
+    format!("item/{patch}/{id}")
 }
 
 impl SelectionUi {
@@ -2297,37 +2323,42 @@ mod tests {
 
 impl App {
     /// Draws layout B; returns the enemy champion the user clicked, if any.
-    fn panel(&self, ctx: &egui::Context, view: &PanelView) -> Option<String> {
+    fn panel(&mut self, ctx: &egui::Context, view: &PanelView) -> Option<String> {
+        if let Some(catalog) = self.catalog.as_ref() {
+            self.icons.prepare_items(&view.build, &catalog.patch);
+        }
         egui::TopBottomPanel::top("high_elo").show(ctx, |ui| {
-            egui::ScrollArea::vertical().show(ui, |ui| high_elo(ui, &view.high_elo));
+            high_elo(ui, &view.high_elo);
         });
         egui::TopBottomPanel::bottom("lane").show(ctx, |ui| {
-            egui::ScrollArea::vertical().show(ui, |ui| lane(ui, view.lane.as_ref()));
+            lane(ui, view.lane.as_ref());
         });
-        egui::SidePanel::left("me")
-            .exact_width(330.0)
-            .resizable(false)
+        egui::CentralPanel::default()
             .show(ctx, |ui| {
-                egui::ScrollArea::vertical().show(ui, |ui| me(ui, &view.me, &view.skills));
-            });
-        let picked = egui::SidePanel::right("teams")
-            .exact_width(420.0)
-            .resizable(false)
-            .show(ctx, |ui| {
-                egui::ScrollArea::vertical()
-                    .show(ui, |ui| teams(ui, &view.teams, view.lane.as_ref()))
-                    .inner
-            })
-            .inner;
-        egui::CentralPanel::default().show(ctx, |ui| {
-            egui::ScrollArea::vertical().show(ui, |ui| {
+                let mut picked = None;
                 if let Some(note) = &view.catalog_note {
                     ui.label(RichText::new(note).color(WARN));
                 }
-                build(ui, &view.build, view.me.gold);
-            });
-        });
-        picked
+                build(
+                    ui,
+                    &view.build,
+                    view.me.gold,
+                    self.catalog
+                        .as_ref()
+                        .map(|catalog| catalog.patch.as_str())
+                        .unwrap_or_default(),
+                    &self.icons.textures,
+                );
+                ui.separator();
+                skill_grid(ui, &view.skills);
+                ui.separator();
+                ui.columns(2, |columns| {
+                    me(&mut columns[0], &view.me, &view.skills);
+                    picked = teams(&mut columns[1], &view.teams, view.lane.as_ref());
+                });
+                picked
+            })
+            .inner
     }
 }
 
@@ -2363,6 +2394,154 @@ fn high_elo_recommendation(ui: &mut egui::Ui, view: &HighEloView) {
 }
 
 fn me(ui: &mut egui::Ui, me: &MeView, skills: &SkillView) {
+    ui.label(RichText::new(format!("{} · level {}", me.champion, me.level)).strong());
+    ui.label(format!(
+        "Gold {} · CS {} · KDA {}/{}/{}",
+        me.gold, me.cs, me.kda.0, me.kda.1, me.kda.2
+    ));
+    if skills.points_available > 0 {
+        let next = skills
+            .next_skill
+            .map_or(String::new(), |skill| format!(" -> {skill}"));
+        ui.label(
+            RichText::new(format!("{} skill point(s){next}", skills.points_available)).color(WARN),
+        );
+    }
+}
+
+fn build(
+    ui: &mut egui::Ui,
+    build: &BuildView,
+    gold: u32,
+    patch: &str,
+    icons: &HashMap<String, egui::TextureHandle>,
+) {
+    ui.label(RichText::new(format!("Build · gold {gold}")).strong());
+    ui.horizontal_wrapped(|ui| {
+        for item in &build.items {
+            let stroke = if item.next {
+                egui::Stroke::new(2.0_f32, WARN)
+            } else {
+                egui::Stroke::NONE
+            };
+            egui::Frame::new().stroke(stroke).show(ui, |ui| {
+                ui.vertical_centered(|ui| {
+                    if let Some(icon) = icons.get(&item_icon_key(patch, item.id)) {
+                        let tint = if item.owned {
+                            Color32::from_gray(110)
+                        } else {
+                            Color32::WHITE
+                        };
+                        ui.add(
+                            egui::Image::new(icon)
+                                .fit_to_exact_size(egui::vec2(48.0, 48.0))
+                                .tint(tint),
+                        );
+                    } else {
+                        ui.allocate_space(egui::vec2(48.0, 48.0));
+                    }
+                    let suffix = if item.owned { " ✓" } else { "" };
+                    let color = if item.owned { MUTED } else { Color32::WHITE };
+                    ui.label(
+                        RichText::new(format!("{}{}", short_item_name(&item.name), suffix))
+                            .small()
+                            .color(color),
+                    );
+                    if item.next {
+                        if let Some(component) = &item.next_component {
+                            ui.label(
+                                RichText::new(short_item_name(component))
+                                    .small()
+                                    .color(WARN),
+                            );
+                        }
+                        ui.label(
+                            RichText::new(format!("{} gold", item.missing_gold))
+                                .small()
+                                .color(WARN),
+                        );
+                    }
+                });
+            });
+        }
+    });
+    if let Some(line) = &build.free_boots_line {
+        ui.label(RichText::new(line).small().color(MUTED));
+    }
+    if !build.affordable_now.is_empty() {
+        ui.horizontal_wrapped(|ui| {
+            ui.label(RichText::new("Dá para comprar agora:").small().color(GOOD));
+            for (name, id) in build.affordable_now.iter().zip(&build.affordable_now_ids) {
+                if let Some(icon) = icons.get(&item_icon_key(patch, *id)) {
+                    ui.add(
+                        egui::Image::new(icon)
+                            .fit_to_exact_size(egui::vec2(24.0, 24.0))
+                            .sense(egui::Sense::hover()),
+                    )
+                    .on_hover_text(name);
+                }
+            }
+        });
+    }
+    if let Some(message) = &build.empty_message {
+        ui.label(message);
+    }
+}
+
+fn short_item_name(name: &str) -> String {
+    const LIMIT: usize = 14;
+    let mut result = name.chars().take(LIMIT).collect::<String>();
+    if name.chars().nth(LIMIT).is_some() {
+        result.push('…');
+    }
+    result
+}
+
+fn skill_grid(ui: &mut egui::Ui, skills: &SkillView) {
+    ui.label(RichText::new("Skills").strong());
+    egui::Grid::new("skill_grid")
+        .spacing(egui::vec2(2.0, 2.0))
+        .show(ui, |ui| {
+            ui.label("");
+            for level in 1..=18 {
+                ui.label(RichText::new(level.to_string()).small());
+            }
+            ui.end_row();
+            for (skill, letter) in ['Q', 'W', 'E', 'R'].into_iter().enumerate() {
+                ui.label(letter.to_string());
+                for level in 0..18 {
+                    let current = skills.current_level == (level + 1) as u32;
+                    let next = skills.next_point == Some((skill, level));
+                    let fill = if next {
+                        WARN
+                    } else if skills.grid[skill][level] {
+                        GOOD
+                    } else {
+                        Color32::from_gray(45)
+                    };
+                    let stroke = if current {
+                        egui::Stroke::new(1.5_f32, Color32::WHITE)
+                    } else {
+                        egui::Stroke::NONE
+                    };
+                    egui::Frame::new().fill(fill).stroke(stroke).show(ui, |ui| {
+                        ui.allocate_space(egui::vec2(14.0, 14.0));
+                    });
+                }
+                ui.end_row();
+            }
+        });
+    if let Some(priority) = &skills.priority_label {
+        ui.label(
+            RichText::new(format!("Priority: {priority}"))
+                .small()
+                .color(MUTED),
+        );
+    }
+}
+
+#[allow(dead_code)]
+fn old_me(ui: &mut egui::Ui, me: &MeView, skills: &SkillView) {
     ui.heading(format!("{} · nível {}", me.champion, me.level));
     if let Some(fraction) = me.xp_fraction {
         ui.add(egui::ProgressBar::new(fraction));
@@ -2403,7 +2582,8 @@ fn me(ui: &mut egui::Ui, me: &MeView, skills: &SkillView) {
     }
 }
 
-fn build(ui: &mut egui::Ui, build: &BuildView, gold: u32) {
+#[allow(dead_code)]
+fn old_build(ui: &mut egui::Ui, build: &BuildView, gold: u32) {
     ui.heading("Build recomendada");
     ui.label(RichText::new(format!("Ouro agora: {gold}")).color(GOOD));
     if let Some(next) = &build.next_item {

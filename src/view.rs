@@ -65,10 +65,22 @@ pub struct MeView {
 #[derive(Clone, Debug, PartialEq)]
 pub struct BuildView {
     pub blocks: Vec<BlockView>,
+    pub items: Vec<ItemRow>,
     pub next_item: Option<NextItem>,
     pub affordable_now: Vec<String>,
+    pub affordable_now_ids: Vec<u32>,
     pub empty_message: Option<String>,
     pub free_boots_line: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ItemRow {
+    pub id: u32,
+    pub name: String,
+    pub owned: bool,
+    pub next: bool,
+    pub missing_gold: u32,
+    pub next_component: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -94,6 +106,9 @@ pub struct SkillView {
     pub ult_hint: bool,
     pub next_skill: Option<char>,
     pub priority_label: Option<String>,
+    pub grid: [[bool; 18]; 4],
+    pub current_level: u32,
+    pub next_point: Option<(usize, usize)>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -367,6 +382,7 @@ fn build_section(
     });
 
     let mut affordable_now: Vec<String> = Vec::new();
+    let mut affordable_now_ids = Vec::new();
     for id in affordable_ids {
         let Some(item) = c.get(id) else { continue };
         if item.purchasable
@@ -375,14 +391,65 @@ fn build_section(
             && !affordable_now.contains(&item.name)
         {
             affordable_now.push(item.name.clone());
+            affordable_now_ids.push(id);
         }
     }
 
     let empty = b.starting.is_empty() && b.stages.is_empty();
+    let row_ids = b
+        .starting
+        .first()
+        .into_iter()
+        .flatten()
+        .chain(b.stages.iter().flat_map(|stage| stage.items.iter()))
+        .copied()
+        .collect::<Vec<_>>();
+    let mut remaining_owned = owned.to_vec();
+    let items = row_ids
+        .into_iter()
+        .map(|id| {
+            let owned = remaining_owned
+                .iter()
+                .position(|&actual| actual == id)
+                .or_else(|| {
+                    remaining_owned
+                        .iter()
+                        .position(|&actual| c.is_or_evolves_from(actual, id))
+                })
+                .map(|index| {
+                    remaining_owned.swap_remove(index);
+                    true
+                })
+                .unwrap_or(false);
+            let next = next_id == Some(id);
+            let (missing_gold, next_component) = if next {
+                let detail = next_item.as_ref();
+                (
+                    detail.map_or(0, |item| item.missing_gold),
+                    detail
+                        .and_then(|item| item.next_component.as_ref())
+                        .map(|(name, _)| name.clone()),
+                )
+            } else {
+                (0, None)
+            };
+            ItemRow {
+                id,
+                name: c.name(id),
+                owned,
+                next,
+                missing_gold,
+                next_component,
+            }
+        })
+        .collect();
+
     BuildView {
         blocks,
+        items,
         next_item,
         affordable_now,
+        affordable_now_ids,
         empty_message: empty.then(|| "Sem build recomendada para este campeão".to_owned()),
         free_boots_line: free_boots.then(|| "Botas grátis pela runa (Calçados Mágicos)".to_owned()),
     }
@@ -431,6 +498,13 @@ fn skill_section(s: &GameSnapshot, order: Option<&SkillOrder>) -> SkillView {
             .collect();
         (!letters.is_empty()).then(|| letters.join(" > "))
     });
+    let grid = order.map_or([[false; 18]; 4], skill_grid);
+    let next_point = next_skill.and_then(|skill| {
+        SKILL_LETTERS
+            .iter()
+            .position(|&letter| letter == skill)
+            .map(|skill| (skill, level.saturating_sub(1) as usize))
+    });
 
     SkillView {
         q: a.q,
@@ -441,7 +515,44 @@ fn skill_section(s: &GameSnapshot, order: Option<&SkillOrder>) -> SkillView {
         ult_hint,
         next_skill,
         priority_label,
+        grid,
+        current_level: level,
+        next_point,
     }
+}
+
+fn skill_grid(order: &SkillOrder) -> [[bool; 18]; 4] {
+    let mut grid = [[false; 18]; 4];
+    let mut ranks = [0_u32; 4];
+    for level in 1_u32..=18 {
+        let can_raise = |skill: usize, ranks: &[u32; 4]| match skill {
+            0..=2 => ranks[skill] < 5 && ranks[skill] < level.div_ceil(2),
+            3 => ranks[skill] < 3 && ULT_LEVELS.contains(&level),
+            _ => false,
+        };
+        let early = order
+            .early
+            .get((level - 1) as usize)
+            .map(|&skill| usize::from(skill));
+        let skill = ULT_LEVELS
+            .contains(&level)
+            .then_some(3)
+            .filter(|&skill| can_raise(skill, &ranks))
+            .or_else(|| early.filter(|&skill| can_raise(skill, &ranks)))
+            .or_else(|| {
+                order
+                    .priority
+                    .iter()
+                    .map(|&skill| usize::from(skill))
+                    .find(|&skill| can_raise(skill, &ranks))
+            })
+            .or_else(|| (0..3).find(|&skill| can_raise(skill, &ranks)));
+        if let Some(skill) = skill {
+            grid[skill][(level - 1) as usize] = true;
+            ranks[skill] += 1;
+        }
+    }
+    grid
 }
 
 fn same_side(a: &PlayerInfo, b: &PlayerInfo) -> bool {
@@ -841,6 +952,67 @@ mod tests {
     }
 
     #[test]
+    fn items_row_marks_owned_and_next() {
+        let (c, mut s) = (catalog(), classic());
+        let build = RecommendedBuild {
+            starting: vec![vec![1001]],
+            stages: vec![ItemStage {
+                items: vec![3006, 3047],
+                max_completed: None,
+            }],
+        };
+        set_items(&mut s, 0.0, &[1001]);
+
+        let items = build_view(&s, &c, &build, None, None, None).build.items;
+
+        assert_eq!(
+            items
+                .iter()
+                .map(|item| (item.id, item.owned, item.next))
+                .collect::<Vec<_>>(),
+            vec![
+                (1001, true, false),
+                (3006, false, true),
+                (3047, false, false)
+            ]
+        );
+        assert_eq!(items[1].missing_gold, c.remaining_cost(3006, &[1001]));
+        assert!(items[1].next_component.is_some());
+    }
+
+    #[test]
+    fn skill_grid_fills_18_levels_from_order_and_priority() {
+        let (build, _) = thresh();
+        let (c, mut s) = (catalog(), classic());
+        let order = SkillOrder {
+            priority: vec![3, 0, 2, 1],
+            early: vec![0, 2, 1, 0],
+        };
+        set_skills(&mut s, 8, 3, 1, 2, 1);
+
+        let skills = build_view(&s, &c, &build, Some(&order), None, None).skills;
+
+        let learned = (0..18)
+            .map(|level| {
+                SKILL_LETTERS[skills
+                    .grid
+                    .iter()
+                    .position(|row| row[level])
+                    .expect("one skill per level")]
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            learned,
+            vec![
+                'Q', 'E', 'W', 'Q', 'Q', 'R', 'Q', 'E', 'Q', 'E', 'R', 'E', 'E', 'W', 'W', 'R',
+                'W', 'W'
+            ]
+        );
+        assert_eq!(skills.current_level, 8);
+        assert_eq!(skills.next_point, Some((0, 7)));
+    }
+
+    #[test]
     fn upgraded_boots_mark_boots_stage_done() {
         let (c, mut s) = (catalog(), classic());
         let build = RecommendedBuild {
@@ -1015,6 +1187,51 @@ mod tests {
     }
 
     #[test]
+    fn exact_match_before_evolution_in_items_row() {
+        let (c, mut s) = (catalog(), classic());
+        let build = RecommendedBuild {
+            starting: vec![],
+            stages: vec![ItemStage {
+                items: vec![3006, 3172],
+                max_completed: None,
+            }],
+        };
+        set_items(&mut s, 0.0, &[3172, 3006]);
+
+        let items = build_view(&s, &c, &build, None, None, None).build.items;
+
+        assert_eq!(
+            items
+                .iter()
+                .map(|item| (item.id, item.owned))
+                .collect::<Vec<_>>(),
+            vec![(3006, true), (3172, true)]
+        );
+    }
+
+    #[test]
+    fn skill_grid_forces_ultimates_with_partial_priority() {
+        let grid = skill_grid(&SkillOrder {
+            priority: vec![1],
+            early: vec![],
+        });
+
+        let learned = (0..18)
+            .map(|level| {
+                SKILL_LETTERS[grid
+                    .iter()
+                    .position(|row| row[level])
+                    .expect("one skill per level")]
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(learned[5], 'R');
+        assert_eq!(learned[10], 'R');
+        assert_eq!(learned[15], 'R');
+        assert_eq!(learned[16..], ['E', 'E']);
+    }
+
+    #[test]
     fn owned_counts_preserves_exact_item_multiplicity() {
         let counts = owned_counts(&[3172, 3172]);
 
@@ -1048,6 +1265,18 @@ mod tests {
             .build
             .affordable_now;
         assert!(a.is_empty());
+    }
+
+    #[test]
+    fn affordable_now_exposes_ids_for_icon_rendering() {
+        let (build, _) = thresh();
+        let (c, mut s) = (catalog(), classic());
+        set_items(&mut s, 1245.0, &[1001, 2003]);
+
+        let view = build_view(&s, &c, &build, None, None, None).build;
+
+        assert!(view.affordable_now.contains(&"Couraça de Pano".to_owned()));
+        assert!(view.affordable_now_ids.contains(&1029));
     }
 
     #[test]

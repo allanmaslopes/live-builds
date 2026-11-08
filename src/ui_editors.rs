@@ -52,6 +52,90 @@ pub fn tree_row_options(rules: &RuneRules, draft: &RunePageDraft, row: TreeRow) 
     }
 }
 
+pub fn select_primary_style(rules: &RuneRules, draft: &mut RunePageDraft, style: u32) -> bool {
+    if style == draft.primary_style || !rules.style_ids().contains(&style) {
+        return false;
+    }
+    let previous_primary = draft.primary_style;
+    let previous_sub = draft.sub_style;
+    let allowed = rules.allowed_sub_styles(style);
+    let Some(sub_style) = (if previous_sub != style && allowed.contains(&previous_sub) {
+        Some(previous_sub)
+    } else if allowed.contains(&previous_primary) {
+        Some(previous_primary)
+    } else {
+        allowed.first().copied()
+    }) else {
+        return false;
+    };
+    let Some(perks) = draft_for_styles(rules, style, sub_style) else {
+        return false;
+    };
+
+    draft.primary_style = style;
+    draft.sub_style = sub_style;
+    draft.perks = perks;
+    true
+}
+
+pub fn select_secondary_style(rules: &RuneRules, draft: &mut RunePageDraft, style: u32) -> bool {
+    if style == draft.sub_style
+        || !rules
+            .allowed_sub_styles(draft.primary_style)
+            .contains(&style)
+    {
+        return false;
+    }
+    let Some(first) = rules.slot_perks(style, 1).first().copied() else {
+        return false;
+    };
+    let Some(second) = rules.slot_perks(style, 2).first().copied() else {
+        return false;
+    };
+    draft.sub_style = style;
+    draft.perks[4] = first;
+    draft.perks[5] = second;
+    true
+}
+
+pub fn select_tree_perk(
+    rules: &RuneRules,
+    draft: &mut RunePageDraft,
+    row: TreeRow,
+    perk: u32,
+) -> bool {
+    if !tree_row_options(rules, draft, row).contains(&perk) {
+        return false;
+    }
+    let index = match row {
+        TreeRow::Primary(slot) => slot,
+        TreeRow::Secondary(index) => index + 4,
+        TreeRow::Shard(index) => index + 6,
+    };
+    let Some(selected) = draft.perks.get_mut(index) else {
+        return false;
+    };
+    if *selected == perk {
+        return false;
+    }
+    *selected = perk;
+    true
+}
+
+fn draft_for_styles(rules: &RuneRules, primary: u32, secondary: u32) -> Option<[u32; 9]> {
+    Some([
+        *rules.slot_perks(primary, 0).first()?,
+        *rules.slot_perks(primary, 1).first()?,
+        *rules.slot_perks(primary, 2).first()?,
+        *rules.slot_perks(primary, 3).first()?,
+        *rules.slot_perks(secondary, 1).first()?,
+        *rules.slot_perks(secondary, 2).first()?,
+        *rules.slot_perks(primary, 4).first()?,
+        *rules.slot_perks(primary, 5).first()?,
+        *rules.slot_perks(primary, 6).first()?,
+    ])
+}
+
 pub fn new_item_set(sets: &[ItemSet], timestamp_ms: u128) -> ItemSet {
     let base = format!("live-builds-user-{timestamp_ms}");
     let uid = (0..)
@@ -115,14 +199,8 @@ pub fn draw_rune_tree(
                 &name,
                 names.style_icon(style),
                 icons,
-            ) && style != draft.sub_style
-            {
-                draft.primary_style = style;
-                if !rules.allowed_sub_styles(style).contains(&draft.sub_style)
-                    && let Some(sub) = rules.allowed_sub_styles(style).first()
-                {
-                    draft.sub_style = *sub;
-                }
+            ) {
+                select_primary_style(rules, draft, style);
             }
         }
     });
@@ -137,7 +215,7 @@ pub fn draw_rune_tree(
                     names.rune_icon(perk),
                     icons,
                 ) {
-                    draft.perks[slot] = perk;
+                    select_tree_perk(rules, draft, TreeRow::Primary(slot), perk);
                 }
             }
         });
@@ -153,7 +231,7 @@ pub fn draw_rune_tree(
                 names.style_icon(style),
                 icons,
             ) {
-                draft.sub_style = style;
+                select_secondary_style(rules, draft, style);
             }
         }
     });
@@ -168,7 +246,7 @@ pub fn draw_rune_tree(
                     names.rune_icon(perk),
                     icons,
                 ) {
-                    draft.perks[index + 4] = perk;
+                    select_tree_perk(rules, draft, TreeRow::Secondary(index), perk);
                 }
             }
         });
@@ -190,7 +268,7 @@ pub fn draw_rune_tree(
                     names.rune_icon(perk),
                     icons,
                 ) {
-                    draft.perks[index + 6] = perk;
+                    select_tree_perk(rules, draft, TreeRow::Shard(index), perk);
                 }
             }
         });
@@ -495,17 +573,7 @@ pub fn new_page(rules: &RuneRules) -> Option<RunePageDraft> {
         name: "Nova página".to_owned(),
         primary_style: primary,
         sub_style: secondary,
-        perks: [
-            *rules.slot_perks(primary, 0).first()?,
-            *rules.slot_perks(primary, 1).first()?,
-            *rules.slot_perks(primary, 2).first()?,
-            *rules.slot_perks(primary, 3).first()?,
-            *rules.slot_perks(secondary, 1).first()?,
-            *rules.slot_perks(secondary, 2).first()?,
-            *rules.slot_perks(primary, 4).first()?,
-            *rules.slot_perks(primary, 5).first()?,
-            *rules.slot_perks(primary, 6).first()?,
-        ],
+        perks: draft_for_styles(rules, primary, secondary)?,
     })
 }
 
@@ -821,6 +889,85 @@ mod tests {
                 .all(|perk| rules.regular_slot_of(draft.sub_style, *perk)
                     != rules.regular_slot_of(draft.sub_style, draft.perks[5]))
         );
+    }
+
+    #[test]
+    fn precision_keystones_are_all_selectable() {
+        let rules =
+            RuneRules::from_json(include_str!("../tests/fixtures/lcu/perks-styles.json")).unwrap();
+        let mut draft = new_page(&rules).unwrap();
+        select_primary_style(&rules, &mut draft, 8100);
+        select_secondary_style(&rules, &mut draft, 8000);
+
+        assert!(select_primary_style(&rules, &mut draft, 8000));
+        for perk in [8005, 8008, 8021, 8010] {
+            draft.perks[0] = if perk == 8005 { 8008 } else { 8005 };
+            assert!(select_tree_perk(
+                &rules,
+                &mut draft,
+                TreeRow::Primary(0),
+                perk
+            ));
+            assert_eq!(draft.perks[0], perk);
+            assert!(rules.validate(&draft).is_ok());
+        }
+    }
+
+    fn assert_every_primary_tree_rune_is_selectable(style: u32) {
+        let rules =
+            RuneRules::from_json(include_str!("../tests/fixtures/lcu/perks-styles.json")).unwrap();
+        let mut draft = new_page(&rules).unwrap();
+        if draft.primary_style == style {
+            assert!(select_primary_style(&rules, &mut draft, 8100));
+        }
+        assert!(select_primary_style(&rules, &mut draft, style));
+
+        for slot in 0..7 {
+            let row = if slot < 4 {
+                TreeRow::Primary(slot)
+            } else {
+                TreeRow::Shard(slot - 4)
+            };
+            for perk in rules.slot_perks(style, slot) {
+                let mut selected = draft.clone();
+                let index = if slot < 4 { slot } else { slot + 2 };
+                selected.perks[index] = rules
+                    .slot_perks(style, slot)
+                    .into_iter()
+                    .find(|candidate| *candidate != perk)
+                    .unwrap();
+                assert!(select_tree_perk(&rules, &mut selected, row, perk));
+                assert!(
+                    rules.validate(&selected).is_ok(),
+                    "style {style}, perk {perk}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn precision_tree_runes_are_selectable_and_valid() {
+        assert_every_primary_tree_rune_is_selectable(8000);
+    }
+
+    #[test]
+    fn domination_tree_runes_are_selectable_and_valid() {
+        assert_every_primary_tree_rune_is_selectable(8100);
+    }
+
+    #[test]
+    fn sorcery_tree_runes_are_selectable_and_valid() {
+        assert_every_primary_tree_rune_is_selectable(8200);
+    }
+
+    #[test]
+    fn inspiration_tree_runes_are_selectable_and_valid() {
+        assert_every_primary_tree_rune_is_selectable(8300);
+    }
+
+    #[test]
+    fn resolve_tree_runes_are_selectable_and_valid() {
+        assert_every_primary_tree_rune_is_selectable(8400);
     }
 
     fn painted_text(shape: &egui::epaint::Shape, text: &mut Vec<String>) {

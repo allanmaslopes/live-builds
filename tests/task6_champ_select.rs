@@ -669,13 +669,16 @@ fn recommend_kaisa(package: &KnowledgePackage, player_keystone: Option<u32>) -> 
 }
 
 #[test]
-fn recommendation_lists_up_to_three_valid_pages() {
+fn recommendation_lists_all_valid_pages() {
     let package = five_page_package();
 
     let rec = recommend_kaisa(&package, None);
 
     let keystones: Vec<_> = rec.pages.iter().map(|o| o.keystone_name.as_str()).collect();
-    assert_eq!(keystones, ["Ritmo Fatal", "Pressione o Ataque", "8021"]);
+    assert_eq!(
+        keystones,
+        ["Ritmo Fatal", "Pressione o Ataque", "8021", "8010"]
+    );
     assert_eq!((rec.pages[0].games, rec.pages[0].win_rate), (12, 0.5));
     assert!(!rec.pages[0].low_sample);
     assert!(rec.pages[1].low_sample);
@@ -684,7 +687,7 @@ fn recommendation_lists_up_to_three_valid_pages() {
 
     let rec = recommend_kaisa(&package, Some(8021));
     assert_eq!(rec.pages[0].draft.perks[0], 8021);
-    assert_eq!(rec.pages.len(), 3);
+    assert_eq!(rec.pages.len(), 4);
 }
 
 #[test]
@@ -704,7 +707,8 @@ fn chosen_option_drives_item_set() {
             .iter()
             .any(|b| b.items.first() == Some(&3302))
     );
-    assert!(rec.choose(3).is_none());
+    assert!(rec.choose(3).is_some());
+    assert!(rec.choose(4).is_none());
 }
 
 #[test]

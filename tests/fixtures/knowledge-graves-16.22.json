@@ -1,0 +1,82 @@
+{
+  "formatVersion": 2,
+  "patch": "16.22",
+  "computedAt": "2026-11-07T18:15:17.763669400Z",
+  "matches": 750,
+  "entries": [
+    {
+      "patch": "16.22",
+      "championId": 104,
+      "position": "JUNGLE",
+      "games": 319,
+      "wins": 156,
+      "winRate": 0.4890,
+      "starting": [{"sequence": [1101], "games": 69, "wins": 35, "winRate": 0.5072}],
+      "boots": [{"sequence": [1001], "games": 197, "wins": 95, "winRate": 0.4822}],
+      "buildPaths": [{"sequence": [6697, 6676, 3036], "games": 43, "wins": 24, "winRate": 0.5581}],
+      "fullBuildPaths": [],
+      "skillOrders": [{"sequence": [3, 1, 2, 1, 1, 4, 1, 3, 1], "games": 142, "wins": 69, "winRate": 0.4859}],
+      "skillPriority": "R > Q > E > W",
+      "lowSample": false,
+      "runePages": [
+        {
+          "keystone": 8128,
+          "primaryStyle": 8100,
+          "subStyle": 8000,
+          "perks": [8128, 8143, 8140, 8135, 9104, 9111],
+          "statPerks": {"offense": 5005, "flex": 5008, "defense": 5001},
+          "games": 92,
+          "wins": 45,
+          "winRate": 0.4891,
+          "lowSample": false,
+          "buildPath": {"sequence": [3142, 6676, 3036], "games": 25, "wins": 17, "winRate": 0.6800},
+          "buildPathLowSample": false
+        },
+        {
+          "keystone": 8021,
+          "primaryStyle": 8000,
+          "subStyle": 8300,
+          "perks": [8021, 9111, 9104, 8014, 8347, 8304],
+          "statPerks": {"offense": 5005, "flex": 5008, "defense": 5001},
+          "games": 69,
+          "wins": 32,
+          "winRate": 0.4638,
+          "lowSample": false,
+          "buildPath": {"sequence": [6697, 6676, 3036], "games": 24, "wins": 16, "winRate": 0.6667},
+          "buildPathLowSample": false
+        },
+        {
+          "keystone": 8010,
+          "primaryStyle": 8000,
+          "subStyle": 8100,
+          "perks": [8010, 9111, 9104, 8017, 8106, 8143],
+          "statPerks": {"offense": 5005, "flex": 5008, "defense": 5001},
+          "games": 1,
+          "wins": 0,
+          "winRate": 0.0,
+          "lowSample": true,
+          "buildPath": {"sequence": [6697, 6676, 3036], "games": 43, "wins": 24, "winRate": 0.5581},
+          "buildPathLowSample": false
+        },
+        {
+          "keystone": 8230,
+          "primaryStyle": 8200,
+          "subStyle": 8000,
+          "perks": [8230, 8275, 8233, 8232, 9111, 9104],
+          "statPerks": {"offense": 5008, "flex": 5008, "defense": 5001},
+          "games": 1,
+          "wins": 0,
+          "winRate": 0.0,
+          "lowSample": true,
+          "buildPath": {"sequence": [6697, 6676, 3036], "games": 43, "wins": 24, "winRate": 0.5581},
+          "buildPathLowSample": false
+        }
+      ],
+      "primary": {
+        "keystone": 8128,
+        "summonerSpells": [4, 11],
+        "summonerSpellsLowSample": false
+      }
+    }
+  ]
+}

@@ -163,7 +163,7 @@ pub struct Recommendation {
     pub spells: (u32, u32),
     pub item_set: Option<ItemSet>,
     pub source: Source,
-    /// Até 3 opções válidas; a de índice 0 é a recomendada.
+    /// Todas as opções válidas; a de índice 0 é a recomendada.
     pub pages: Vec<RuneOption>,
 }
 
@@ -231,7 +231,6 @@ pub fn recommend(
                             item_set: make_set(&to_recommendations(entry, Some(rune_page)).0),
                         })
                     })
-                    .take(3)
                     .collect();
             let (page, item_set) = if let Some(best) = pages.first() {
                 (Some(best.draft.clone()), best.item_set.clone())
@@ -499,4 +498,71 @@ pub(crate) fn phase_from_json(value: &Value) -> Result<Phase, LcuError> {
     } else {
         Phase::Other(phase.to_owned())
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn graves_options_include_fleet_footwork_page() {
+        let package: KnowledgePackage = serde_json::from_str(include_str!(
+            "../../tests/fixtures/knowledge-graves-16.22.json"
+        ))
+        .unwrap();
+        let rules =
+            RuneRules::from_json(include_str!("../../tests/fixtures/lcu/perks-styles.json"))
+                .unwrap();
+        let catalog = ItemCatalog::from_ddragon_json(
+            "16.22.1",
+            include_str!("../../tests/fixtures/item_sample.json"),
+        )
+        .unwrap();
+        let statics = StaticSource::with_fetcher(std::env::temp_dir(), |_| {
+            Err("network must not be used".to_owned())
+        });
+
+        let recommendation = recommend(
+            Some(&package),
+            None,
+            &statics,
+            "16.22",
+            104,
+            "Graves",
+            "JUNGLE",
+            (11, "CLASSIC"),
+            None,
+            None,
+            &rules,
+            &catalog,
+            &KnowledgeNames::default(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            recommendation
+                .pages
+                .iter()
+                .map(|option| option.draft.perks[0])
+                .collect::<Vec<_>>(),
+            vec![8128, 8021, 8010, 8230]
+        );
+        let fleet = recommendation
+            .pages
+            .iter()
+            .find(|option| option.draft.perks[0] == 8021)
+            .unwrap();
+        assert_eq!(fleet.games, 69);
+        assert_eq!(
+            fleet
+                .item_set
+                .as_ref()
+                .unwrap()
+                .blocks
+                .last()
+                .unwrap()
+                .items,
+            vec![6697, 6676, 3036]
+        );
+    }
 }

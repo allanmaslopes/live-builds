@@ -43,9 +43,28 @@ fn raw_pages(http: &dyn LcuHttp) -> Result<Vec<Value>, LcuError> {
         .ok_or_else(|| LcuError::Other("resposta de páginas de runas não é uma lista".to_owned()))
 }
 
-/// Só o `id` da resposta importa; sem ele, relista e acha a página pelo nome.
+/// Criação pelo editor: nome `live-builds` é reservado e a página não vira a ativa.
 pub fn create_page(http: &dyn LcuHttp, draft: &RunePageDraft) -> Result<ClientPage, LcuError> {
-    let response = http.send("POST", PAGES, &page_body(draft))?;
+    check_name(draft)?;
+    post_page(http, draft, false)
+}
+
+fn check_name(draft: &RunePageDraft) -> Result<(), LcuError> {
+    if draft.name.trim().eq_ignore_ascii_case(APP_PAGE_NAME) {
+        return Err(LcuError::Other(
+            "Nome reservado para o live-builds".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+/// Só o `id` da resposta importa; sem ele, relista e acha a página pelo nome.
+fn post_page(
+    http: &dyn LcuHttp,
+    draft: &RunePageDraft,
+    current: bool,
+) -> Result<ClientPage, LcuError> {
+    let response = http.send("POST", PAGES, &page_body(draft, current))?;
     if let Ok(page) = parse_page(&response) {
         return Ok(page);
     }
@@ -63,14 +82,33 @@ pub fn create_page(http: &dyn LcuHttp, draft: &RunePageDraft) -> Result<ClientPa
         name: draft.name.clone(),
         editable: true,
         temporary: false,
-        current: true,
+        current,
         draft: draft.clone(),
     })
 }
 
 /// O chamador (editor) é responsável por pedir confirmação antes de alterar a página.
 pub fn update_page(http: &dyn LcuHttp, id: u64, draft: &RunePageDraft) -> Result<(), LcuError> {
-    http.send("PUT", &format!("{PAGES}/{id}"), &page_body(draft))?;
+    // Editar a própria página do app é permitido (objetivo 3 do spec); só renomear outra para o nome reservado não.
+    if check_name(draft).is_err() {
+        let current = http.get(&format!("{PAGES}/{id}"))?;
+        if !current["name"]
+            .as_str()
+            .is_some_and(|name| name.trim().eq_ignore_ascii_case(APP_PAGE_NAME))
+        {
+            check_name(draft)?;
+        }
+    }
+    put_page(http, id, draft, false)
+}
+
+fn put_page(
+    http: &dyn LcuHttp,
+    id: u64,
+    draft: &RunePageDraft,
+    current: bool,
+) -> Result<(), LcuError> {
+    http.send("PUT", &format!("{PAGES}/{id}"), &page_body(draft, current))?;
     Ok(())
 }
 
@@ -107,7 +145,7 @@ pub fn upsert_app_page(
         }
     }
     if let Some(page) = existing {
-        update_page(http, page.id, &draft)?;
+        put_page(http, page.id, &draft, true)?;
         set_current(http, page.id)?;
         return Ok(ApplyOutcome::Updated);
     }
@@ -115,7 +153,7 @@ pub fn upsert_app_page(
     if limit_reached(http)? {
         return Ok(ApplyOutcome::LimitReached);
     }
-    match create_page(http, &draft) {
+    match post_page(http, &draft, true) {
         Ok(page) => {
             set_current(http, page.id)?;
             Ok(ApplyOutcome::Created)
@@ -136,13 +174,13 @@ fn limit_reached(http: &dyn LcuHttp) -> Result<bool, LcuError> {
         .ok_or_else(|| LcuError::Other("inventory de runas sem canAddCustomPage".to_owned()))
 }
 
-fn page_body(draft: &RunePageDraft) -> Value {
+fn page_body(draft: &RunePageDraft, current: bool) -> Value {
     json!({
         "name": draft.name,
         "primaryStyleId": draft.primary_style,
         "subStyleId": draft.sub_style,
         "selectedPerkIds": draft.perks,
-        "current": true,
+        "current": current,
     })
 }
 

@@ -5,7 +5,7 @@ use crate::lcu::champ_select::{
     set_spells,
 };
 use crate::lcu::item_sets::upsert_app_set;
-use crate::lcu::item_sets::{delete_user_set, list_sets, save_user_set};
+use crate::lcu::item_sets::{create_user_set, delete_user_set, list_sets, save_user_set};
 use crate::lcu::perks::{
     ApplyOutcome, create_page, delete_page, list_pages, update_page, upsert_app_page,
 };
@@ -25,13 +25,14 @@ use egui::{Color32, RichText};
 use std::cmp::Ordering;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
 const MUTED: Color32 = Color32::from_gray(150);
 const GOOD: Color32 = Color32::from_rgb(110, 200, 120);
+const SELECTION_CHANGED: &str = "A seleção mudou durante a aplicação: confira runas e feitiços";
 const WARN: Color32 = Color32::from_rgb(240, 190, 80);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -122,6 +123,12 @@ impl SelectionLoadTracker {
     fn reset(&mut self) {
         *self = Self::default();
     }
+
+    /// Worker morto: nenhuma nova tentativa adianta, então para de mostrar "carregando".
+    fn give_up(&mut self) {
+        self.in_flight = false;
+        self.failures = u8::MAX;
+    }
 }
 
 pub fn save_settings(settings: &mut Settings, path: &Path) -> Result<(), String> {
@@ -172,6 +179,10 @@ impl EditorRequestTracker {
 
     fn loading(&self) -> bool {
         self.loading
+    }
+
+    fn clear(&mut self) {
+        self.loading = false;
     }
 }
 
@@ -235,6 +246,14 @@ impl SelectionUi {
         self.recalculate_differences(names);
     }
 
+    /// Recarga com a mesma chave (troca de patch) não pode esquecer o que já foi aplicado.
+    fn inherit(&mut self, old: SelectionUi) {
+        self.applied = old.applied;
+        self.applied_page = old.applied_page;
+        self.user_edited = old.user_edited;
+        self.stale_page = old.stale_page;
+    }
+
     fn recalculate_differences(&mut self, names: &KnowledgeNames) {
         self.differences = self.observed_page.as_ref().map_or_else(Vec::new, |page| {
             reminder(page, self.observed_spells, &self.recommendation, names)
@@ -285,12 +304,15 @@ enum UiResult {
         key: SelectionKey,
         action: Action,
         result: Result<Option<bool>, String>,
+        selection_changed: bool,
     },
     Editor {
         generation: u64,
         result: Box<Result<Option<EditorSnapshot>, String>>,
         saved_settings: bool,
         edited_runes: bool,
+        reset_page: bool,
+        reset_set: bool,
         selection_session: Option<String>,
     },
 }
@@ -359,15 +381,20 @@ impl UiWorker {
                         action,
                         recommendation,
                     } => {
-                        let result = connect_lcu(lockfile.as_deref())
+                        let checked = connect_lcu(lockfile.as_deref())
                             .map_err(|error| error.to_string())
                             .and_then(|http| {
-                                apply_recommendation(&http, &key, action, &recommendation)
+                                apply_and_verify(&http, &key, action, &recommendation)
                             });
+                        let (result, selection_changed) = match checked {
+                            Ok((applied, changed)) => (Ok(applied), changed),
+                            Err(error) => (Err(error), false),
+                        };
                         UiResult::Applied {
                             key,
                             action,
                             result,
+                            selection_changed,
                         }
                     }
                     UiCommand::Editor {
@@ -381,6 +408,18 @@ impl UiWorker {
                             &action,
                             EditorAction::CreatePage(_) | EditorAction::SavePage(_, _)
                         );
+                        let reset_page = matches!(
+                            &action,
+                            EditorAction::CreatePage(_)
+                                | EditorAction::SavePage(_, _)
+                                | EditorAction::DeletePage(_)
+                        );
+                        let reset_set = matches!(
+                            &action,
+                            EditorAction::CreateSet(_)
+                                | EditorAction::SaveSet(_)
+                                | EditorAction::DeleteSet(_)
+                        );
                         let result = process_editor_command(
                             lockfile.as_deref(),
                             &statics,
@@ -393,6 +432,8 @@ impl UiWorker {
                             result: Box::new(result),
                             saved_settings,
                             edited_runes,
+                            reset_page,
+                            reset_set,
                             selection_session,
                         }
                     }
@@ -526,19 +567,37 @@ fn resolve_selection_version(discovered: Option<String>, cache_dir: &Path) -> Op
         .max_by(|left, right| compare_patch_versions(left, right))
 }
 
-fn apply_recommendation(
+/// Aplica e relê a sessão; `true` no fim = a seleção mudou durante a aplicação (sem reverter).
+// shortcut: a LCU não tem transação; só vemos mudança até esta releitura e, se ela ocorrer depois,
+// o próximo poll da seleção mostra a diferença.
+fn apply_and_verify(
     http: &dyn LcuHttp,
     key: &SelectionKey,
     action: Action,
     recommendation: &Recommendation,
-) -> Result<Option<bool>, String> {
+) -> Result<(Option<bool>, bool), String> {
+    let applied = apply_recommendation(http, key, action, recommendation)?;
+    let changed = applied.is_some() && session_key(http)?.as_ref() != Some(key);
+    Ok((applied, changed))
+}
+
+fn session_key(http: &dyn LcuHttp) -> Result<Option<SelectionKey>, String> {
     let session = http
         .get("/lol-champ-select/v1/session")
         .map_err(|error| error.to_string())?;
     let my_cell = session["localPlayerCellId"]
         .as_i64()
         .ok_or_else(|| "sessão sem localPlayerCellId".to_owned())?;
-    if parse_session(&session, my_cell).selection_key().as_ref() != Some(key) {
+    Ok(parse_session(&session, my_cell).selection_key())
+}
+
+fn apply_recommendation(
+    http: &dyn LcuHttp,
+    key: &SelectionKey,
+    action: Action,
+    recommendation: &Recommendation,
+) -> Result<Option<bool>, String> {
+    if session_key(http)?.as_ref() != Some(key) {
         return Ok(None);
     }
     let applied = match action {
@@ -589,7 +648,10 @@ fn process_editor_command(
         EditorAction::DeletePage(id) => {
             delete_page(&http, id).map_err(|error| error.to_string())?;
         }
-        EditorAction::CreateSet(set) | EditorAction::SaveSet(set) => {
+        EditorAction::CreateSet(set) => {
+            create_user_set(&http, &set).map_err(|error| error.to_string())?;
+        }
+        EditorAction::SaveSet(set) => {
             save_user_set(&http, &set).map_err(|error| error.to_string())?;
         }
         EditorAction::DeleteSet(uid) => {
@@ -896,7 +958,20 @@ impl App {
     }
 
     fn drain_worker(&mut self) {
-        while let Ok(result) = self.ui_worker.results.try_recv() {
+        loop {
+            let result = match self.ui_worker.results.try_recv() {
+                Ok(result) => result,
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => {
+                    let message = "worker da interface foi encerrado; reinicie o app".to_owned();
+                    self.selection_load.give_up();
+                    self.editor_requests.clear();
+                    self.patch_check_in_flight = false;
+                    self.editors.status = Some(message.clone());
+                    self.selection_error = Some(message);
+                    break;
+                }
+            };
             match result {
                 UiResult::Selection {
                     state,
@@ -912,7 +987,13 @@ impl App {
                             self.selection_error = None;
                             self.catalog = Some(payload.catalog);
                             self.names = payload.names;
-                            self.selection = Some(payload.selection);
+                            let mut fresh = payload.selection;
+                            if let Some(old) = self.selection.take()
+                                && old.key == fresh.key
+                            {
+                                fresh.inherit(old);
+                            }
+                            self.selection = Some(fresh);
                             self.selection_load.succeeded();
                             self.next_patch_check = Instant::now() + Duration::from_secs(60);
                         }
@@ -922,21 +1003,28 @@ impl App {
                         Err(_) if is_check => {
                             self.next_patch_check = Instant::now() + Duration::from_secs(60);
                         }
-                        Err(_) => self.selection_load.failed(Instant::now()),
+                        Err(error) => {
+                            self.selection_error = Some(error);
+                            self.selection_load.failed(Instant::now());
+                        }
                     }
                 }
                 UiResult::Applied {
                     key,
                     action,
                     result,
+                    selection_changed,
                 } => {
+                    if selection_changed {
+                        self.selection_error = Some(SELECTION_CHANGED.to_owned());
+                    }
                     if self.selection.as_ref().map(|selection| &selection.key) != Some(&key) {
                         continue;
                     }
                     let succeeded = result.as_ref().is_ok_and(|applied| *applied == Some(true));
                     if let Err(error) = &result {
                         self.selection_error = Some(error.clone());
-                    } else if result.as_ref().is_ok_and(Option::is_some) {
+                    } else if result.as_ref().is_ok_and(Option::is_some) && !selection_changed {
                         self.selection_error = None;
                     }
                     if let Some(selection) = &mut self.selection {
@@ -953,6 +1041,8 @@ impl App {
                     result,
                     saved_settings,
                     edited_runes,
+                    reset_page,
+                    reset_set,
                     selection_session,
                 } => {
                     if !self.editor_requests.complete(generation) {
@@ -975,32 +1065,18 @@ impl App {
                             }
                             if let Some(snapshot) = snapshot {
                                 self.editors.rules = Some(snapshot.rules);
-                                self.editors.pages = snapshot.pages;
-                                self.editors.sets = snapshot.sets;
                                 if let Some(catalog) = snapshot.catalog {
                                     self.catalog = Some(catalog);
                                 }
                                 if let Some(names) = snapshot.names {
                                     self.names = names;
                                 }
-                                let page_index = self
-                                    .editors
-                                    .selected_page
-                                    .filter(|index| *index < self.editors.pages.len())
-                                    .or_else(|| (!self.editors.pages.is_empty()).then_some(0));
-                                let set_index = self
-                                    .editors
-                                    .selected_set
-                                    .filter(|index| *index < self.editors.sets.len())
-                                    .or_else(|| (!self.editors.sets.is_empty()).then_some(0));
-                                self.editors.page_draft = None;
-                                self.editors.set_draft = None;
-                                if let Some(index) = page_index {
-                                    self.editors.edit_page(index);
-                                }
-                                if let Some(index) = set_index {
-                                    self.editors.edit_set(index);
-                                }
+                                self.editors.replace_lists(
+                                    snapshot.pages,
+                                    snapshot.sets,
+                                    reset_page,
+                                    reset_set,
+                                );
                                 self.editors.loaded = true;
                             }
                             self.editors.status = Some("Salvo".to_owned());
@@ -1302,6 +1378,125 @@ mod tests {
         selection.observe_client(&state, &KnowledgeNames::default());
 
         assert!(!selection.user_edited);
+    }
+
+    struct ChangingHttp {
+        reads: Cell<u8>,
+    }
+
+    impl LcuHttp for ChangingHttp {
+        fn get(&self, _path: &str) -> Result<Value, LcuError> {
+            let read = self.reads.get() + 1;
+            self.reads.set(read);
+            Ok(json!({
+                "gameId": 10,
+                "localPlayerCellId": 0,
+                "queueId": 420,
+                "myTeam": [{
+                    "cellId": 0,
+                    "championId": if read == 1 { 234 } else { 145 },
+                    "assignedPosition": "jungle",
+                    "spell1Id": 4,
+                    "spell2Id": 14
+                }],
+                "actions": []
+            }))
+        }
+
+        fn send(&self, _method: &str, _path: &str, _body: &Value) -> Result<Value, LcuError> {
+            Ok(Value::Null)
+        }
+    }
+
+    #[test]
+    fn selection_change_after_write_is_reported() {
+        let http = ChangingHttp {
+            reads: Cell::new(0),
+        };
+        let key = SelectionKey {
+            session_id: "10".to_owned(),
+            champion_id: 234,
+            position: "JUNGLE".to_owned(),
+        };
+        let recommendation = Recommendation {
+            page: None,
+            spells: (4, 11),
+            item_set: None,
+            source: Source::Riot,
+        };
+
+        let (applied, changed) =
+            apply_and_verify(&http, &key, Action::Spells, &recommendation).unwrap();
+
+        assert_eq!(applied, Some(true));
+        assert!(changed);
+    }
+
+    #[test]
+    fn reload_with_same_key_keeps_applied_state() {
+        let page = RunePageDraft {
+            name: "live-builds".to_owned(),
+            primary_style: 8000,
+            sub_style: 8100,
+            perks: [8005, 8009, 9103, 3035, 8139, 8135, 5005, 5008, 5011],
+        };
+        let make = || SelectionUi {
+            key: SelectionKey {
+                session_id: "10".to_owned(),
+                champion_id: 234,
+                position: "JUNGLE".to_owned(),
+            },
+            champion: "Viego".to_owned(),
+            recommendation: Recommendation {
+                page: None,
+                spells: (4, 11),
+                item_set: None,
+                source: Source::Riot,
+            },
+            source_patch: None,
+            source_games: None,
+            differences: Vec::new(),
+            applied: AppliedItems::default(),
+            limit_reached: false,
+            applied_page: None,
+            user_edited: false,
+            observed_page: None,
+            observed_spells: (4, 11),
+            stale_page: None,
+        };
+        let mut old = make();
+        old.applied.runes = true;
+        old.applied_page = Some(page.clone());
+        old.user_edited = true;
+        let mut fresh = make();
+
+        fresh.inherit(old);
+
+        assert!(fresh.applied.runes && fresh.user_edited);
+        assert_eq!(fresh.applied_page, Some(page));
+    }
+
+    #[test]
+    fn dead_worker_stops_selection_loading() {
+        let state = SelectState {
+            phase: crate::lcu::champ_select::Phase::ChampSelect,
+            session_id: "10".to_owned(),
+            champion_id: Some(234),
+            locked: true,
+            position: "JUNGLE".to_owned(),
+            spells: (4, 11),
+            map_mode: (11, "CLASSIC".to_owned()),
+            auto_apply: true,
+            active_page: None,
+        };
+        let now = Instant::now();
+        let mut tracker = SelectionLoadTracker::default();
+        assert!(tracker.should_start(&state, now));
+
+        tracker.give_up();
+
+        assert!(!tracker.is_loading(&state));
+        assert!(!tracker.should_start(&state, now + Duration::from_secs(60)));
     }
 
     #[test]

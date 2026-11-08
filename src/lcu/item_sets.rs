@@ -110,6 +110,25 @@ pub fn save_user_set(http: &dyn LcuHttp, item_set: &ItemSet) -> Result<(), LcuEr
     Ok(())
 }
 
+/// Só insere: se o `uid` já existe, troca o sufixo; nunca mescla nem sobrescreve.
+pub fn create_user_set(http: &dyn LcuHttp, item_set: &ItemSet) -> Result<(), LcuError> {
+    let path = sets_path(http)?;
+    let mut response = http.get(&path)?;
+    let sets = response["itemSets"]
+        .as_array_mut()
+        .ok_or_else(|| LcuError::Other("resposta de item sets sem itemSets".to_owned()))?;
+    let taken = |uid: &str| sets.iter().any(|set| set["uid"].as_str() == Some(uid));
+    let mut new_set = item_set.clone();
+    let mut suffix = 1;
+    while taken(&new_set.uid) {
+        suffix += 1;
+        new_set.uid = format!("{}-{suffix}", item_set.uid);
+    }
+    sets.push(serialize_set(&new_set));
+    http.send("PUT", &path, &response)?;
+    Ok(())
+}
+
 /// Apaga somente o arsenal indicado e preserva o envelope e os outros sets do GET.
 pub fn delete_user_set(http: &dyn LcuHttp, uid: &str) -> Result<(), LcuError> {
     let path = sets_path(http)?;
@@ -221,6 +240,7 @@ fn merge_set(existing: &mut Value, item_set: &ItemSet) {
                 });
                 let old_items = value["items"].as_array().cloned().unwrap_or_default();
                 let mut used = vec![false; old_items.len()];
+                let kept = old_items.iter().filter(|item| item_id(item).is_none());
                 let items = block
                     .items
                     .iter()
@@ -237,6 +257,8 @@ fn merge_set(existing: &mut Value, item_set: &ItemSet) {
                             })
                             .unwrap_or_else(|| json!({"count": 1, "id": id.to_string()}))
                     })
+                    // shortcut: ids não numéricos (o editor não os mostra) vão ao fim do bloco
+                    .chain(kept.cloned())
                     .collect();
                 value["type"] = json!(block.name);
                 value["items"] = Value::Array(items);

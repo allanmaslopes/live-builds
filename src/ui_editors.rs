@@ -98,12 +98,24 @@ pub struct PageEditorDraft {
     pub id: Option<u64>,
     pub editable: bool,
     pub draft: RunePageDraft,
+    /// Estado ao abrir o rascunho; serve para saber se há alterações sujas.
+    pub baseline: RunePageDraft,
 }
 
 #[derive(Clone, Debug)]
 pub struct SetEditorDraft {
     pub is_new: bool,
     pub set: ItemSet,
+    pub baseline: ItemSet,
+}
+
+/// Troca de rascunho pendente de confirmação "Descartar alterações?".
+#[derive(Clone, Debug)]
+pub enum DiscardTarget {
+    EditPage(usize),
+    NewPage(RunePageDraft),
+    EditSet(usize),
+    NewSet(ItemSet),
 }
 
 #[derive(Default)]
@@ -121,6 +133,7 @@ pub struct EditorsState {
     pub set_delete: DeleteConfirmation<String>,
     pub loaded: bool,
     pub status: Option<String>,
+    pub discard: Option<DiscardTarget>,
 }
 
 impl EditorsState {
@@ -129,11 +142,147 @@ impl EditorsState {
             return;
         };
         self.selected_page = Some(index);
+        self.page_delete.cancel();
         self.page_draft = Some(PageEditorDraft {
             id: Some(page.id),
             editable: page.editable,
             draft: page.draft.clone(),
+            baseline: page.draft.clone(),
         });
+    }
+
+    pub fn page_dirty(&self) -> bool {
+        self.page_draft
+            .as_ref()
+            .is_some_and(|page| page.draft != page.baseline)
+    }
+
+    pub fn set_dirty(&self) -> bool {
+        self.set_draft
+            .as_ref()
+            .is_some_and(|editor| editor.set != editor.baseline)
+    }
+
+    fn start_new_page(&mut self, draft: RunePageDraft) {
+        self.selected_page = None;
+        self.page_delete.cancel();
+        self.page_draft = Some(PageEditorDraft {
+            id: None,
+            editable: true,
+            baseline: draft.clone(),
+            draft,
+        });
+    }
+
+    fn start_new_set(&mut self, set: ItemSet) {
+        self.selected_set = None;
+        self.set_delete.cancel();
+        self.set_draft = Some(SetEditorDraft {
+            is_new: true,
+            baseline: set.clone(),
+            set,
+        });
+    }
+
+    /// Clique numa página da lista: com rascunho sujo, pede confirmação antes de trocar.
+    pub fn open_page(&mut self, index: usize) {
+        if self.selected_page == Some(index) {
+            return;
+        }
+        if self.page_dirty() {
+            self.discard = Some(DiscardTarget::EditPage(index));
+        } else {
+            self.edit_page(index);
+        }
+    }
+
+    pub fn open_set(&mut self, index: usize) {
+        if self.selected_set == Some(index) {
+            return;
+        }
+        if self.set_dirty() {
+            self.discard = Some(DiscardTarget::EditSet(index));
+        } else {
+            self.edit_set(index);
+        }
+    }
+
+    pub fn request_new_page(&mut self, draft: RunePageDraft) {
+        if self.page_dirty() {
+            self.discard = Some(DiscardTarget::NewPage(draft));
+        } else {
+            self.start_new_page(draft);
+        }
+    }
+
+    pub fn request_new_set(&mut self, set: ItemSet) {
+        if self.set_dirty() {
+            self.discard = Some(DiscardTarget::NewSet(set));
+        } else {
+            self.start_new_set(set);
+        }
+    }
+
+    pub fn confirm_discard(&mut self) {
+        match self.discard.take() {
+            Some(DiscardTarget::EditPage(index)) => self.edit_page(index),
+            Some(DiscardTarget::NewPage(draft)) => self.start_new_page(draft),
+            Some(DiscardTarget::EditSet(index)) => self.edit_set(index),
+            Some(DiscardTarget::NewSet(set)) => self.start_new_set(set),
+            None => {}
+        }
+    }
+
+    /// Confirmação de apagar não sobrevive ao rascunho que ela mirava.
+    pub fn sync_confirmations(&mut self) {
+        if self.page_draft.is_none() {
+            self.page_delete.cancel();
+        }
+        if self.set_draft.is_none() {
+            self.set_delete.cancel();
+        }
+    }
+
+    /// Troca as listas do cliente. Só o rascunho do item salvo (`reset_*`) ou limpo é recarregado;
+    /// um rascunho sujo de outro item sobrevive (ex.: "Atualizar").
+    pub fn replace_lists(
+        &mut self,
+        pages: Vec<ClientPage>,
+        sets: Vec<ItemSet>,
+        reset_page: bool,
+        reset_set: bool,
+    ) {
+        self.pages = pages;
+        self.sets = sets;
+        if reset_page || !self.page_dirty() {
+            let index = self
+                .selected_page
+                .filter(|index| *index < self.pages.len())
+                .or_else(|| (!self.pages.is_empty()).then_some(0));
+            self.page_draft = None;
+            self.selected_page = None;
+            if let Some(index) = index {
+                self.edit_page(index);
+            }
+        } else {
+            let id = self.page_draft.as_ref().and_then(|page| page.id);
+            self.selected_page = id.and_then(|id| self.pages.iter().position(|p| p.id == id));
+        }
+        if reset_set || !self.set_dirty() {
+            let index = self
+                .selected_set
+                .filter(|index| *index < self.sets.len())
+                .or_else(|| (!self.sets.is_empty()).then_some(0));
+            self.set_draft = None;
+            self.selected_set = None;
+            if let Some(index) = index {
+                self.edit_set(index);
+            }
+        } else {
+            let uid = self.set_draft.as_ref().map(|editor| editor.set.uid.clone());
+            self.selected_set = uid.and_then(|uid| self.sets.iter().position(|set| set.uid == uid));
+        }
+        self.sync_confirmations();
     }
 
     pub fn edit_set(&mut self, index: usize) {
@@ -141,9 +290,11 @@ impl EditorsState {
             return;
         };
         self.selected_set = Some(index);
+        self.set_delete.cancel();
         self.set_draft = Some(SetEditorDraft {
             is_new: false,
             set: set.clone(),
+            baseline: set.clone(),
         });
     }
 }
@@ -205,6 +356,19 @@ pub fn draw(
         });
     });
     egui::CentralPanel::default().show(ctx, |ui| {
+        if state.discard.is_some() {
+            ui.colored_label(egui::Color32::LIGHT_RED, "Descartar alterações?");
+            ui.horizontal(|ui| {
+                if ui.button("Descartar").clicked() {
+                    state.confirm_discard();
+                }
+                if ui.button("Continuar editando").clicked() {
+                    state.discard = None;
+                }
+            });
+            ui.separator();
+        }
+        state.sync_confirmations();
         ui.add_enabled_ui(enabled, |ui| match state.tab {
             EditorTab::Runes => draw_runes(ui, state, names, &mut actions),
             EditorTab::ItemSets => draw_sets(ui, state, catalog, &mut actions),
@@ -260,17 +424,12 @@ fn draw_runes(
             }
         }
         if let Some(index) = selected {
-            state.edit_page(index);
+            state.open_page(index);
         }
         if columns[0].button("Criar página").clicked()
             && let Some(draft) = new_page(&rules)
         {
-            state.selected_page = None;
-            state.page_draft = Some(PageEditorDraft {
-                id: None,
-                editable: true,
-                draft,
-            });
+            state.request_new_page(draft);
         }
         let Some(page) = state.page_draft.as_mut() else {
             return;
@@ -365,18 +524,14 @@ fn draw_sets(
             }
         }
         if let Some(index) = selected {
-            state.edit_set(index);
+            state.open_set(index);
         }
         if columns[0].button("Criar arsenal").clicked() {
             let timestamp_ms = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_millis();
-            state.selected_set = None;
-            state.set_draft = Some(SetEditorDraft {
-                is_new: true,
-                set: new_item_set(&state.sets, timestamp_ms),
-            });
+            state.request_new_set(new_item_set(&state.sets, timestamp_ms));
         }
         let Some(editor) = state.set_draft.as_mut() else {
             return;

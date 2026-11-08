@@ -1,6 +1,8 @@
 use std::cell::{Cell, RefCell};
 
-use live_builds::lcu::perks::{ApplyOutcome, list_pages, upsert_app_page};
+use live_builds::lcu::perks::{
+    ApplyOutcome, create_page, list_pages, update_page, upsert_app_page,
+};
 use live_builds::lcu::runes::RunePageDraft;
 use live_builds::lcu::{LcuError, LcuHttp};
 use serde_json::{Value, json};
@@ -66,6 +68,15 @@ impl LcuHttp for FakeLcu {
                 Err(LcuError::Other("inventory fora do ar".into()))
             }
             "/lol-perks/v1/inventory" => Ok(self.inventory.borrow().clone()),
+            _ if path.starts_with("/lol-perks/v1/pages/") => {
+                let id: u64 = path.rsplit('/').next().unwrap().parse().unwrap();
+                self.pages
+                    .borrow()
+                    .iter()
+                    .find(|page| page["id"].as_u64() == Some(id))
+                    .cloned()
+                    .ok_or_else(|| LcuError::Http(404, "page not found".into()))
+            }
             _ => Err(LcuError::Other(format!("unexpected GET: {path}"))),
         }
     }
@@ -331,4 +342,45 @@ fn never_touches_other_pages() {
     assert_eq!(puts[0].0, "/lol-perks/v1/pages/7");
     assert!(fake.writes("DELETE").is_empty());
     assert!(fake.writes("POST").is_empty());
+}
+
+#[test]
+fn editor_create_and_save_do_not_activate_the_page() {
+    let fake = FakeLcu::new(vec![page(1, "outra", true, false)]);
+
+    create_page(&fake, &draft()).unwrap();
+    update_page(&fake, 1, &draft()).unwrap();
+
+    assert_eq!(fake.writes("POST")[0].1["current"], json!(false));
+    assert_eq!(fake.writes("PUT")[0].1["current"], json!(false));
+    assert!(
+        fake.writes("PUT")
+            .iter()
+            .all(|(path, _)| path != "/lol-perks/v1/currentpage")
+    );
+}
+
+#[test]
+fn editor_refuses_reserved_page_name() {
+    let fake = FakeLcu::new(vec![page(1, "outra", true, false)]);
+    let mut reserved = draft();
+    reserved.name = " Live-Builds ".to_owned();
+
+    let created = create_page(&fake, &reserved).unwrap_err().to_string();
+    let renamed = update_page(&fake, 1, &reserved).unwrap_err().to_string();
+
+    assert_eq!(created, "Nome reservado para o live-builds");
+    assert_eq!(renamed, "Nome reservado para o live-builds");
+    assert!(fake.writes("POST").is_empty() && fake.writes("PUT").is_empty());
+}
+
+#[test]
+fn editor_can_save_the_app_page_itself() {
+    let fake = FakeLcu::new(vec![page(7, "live-builds", true, false)]);
+    let mut edited = draft();
+    edited.name = "live-builds".to_owned();
+
+    update_page(&fake, 7, &edited).unwrap();
+
+    assert_eq!(fake.writes("PUT").len(), 1);
 }

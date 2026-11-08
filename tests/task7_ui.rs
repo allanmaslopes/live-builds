@@ -305,3 +305,91 @@ fn corrupted_settings_clear_only_after_successful_save() {
     assert!(save_settings(&mut settings, &directory.path().join("settings.json")).is_ok());
     assert!(!settings.corrupted);
 }
+
+fn client_page(id: u64, name: &str) -> ClientPage {
+    let mut draft = recommendation().page.unwrap();
+    draft.name = name.to_owned();
+    ClientPage {
+        id,
+        name: name.to_owned(),
+        editable: true,
+        temporary: false,
+        current: false,
+        draft,
+    }
+}
+
+fn editors_with_two_pages() -> EditorsState {
+    let mut editors = EditorsState {
+        pages: vec![client_page(1, "A"), client_page(2, "B")],
+        sets: vec![recommendation().item_set.unwrap()],
+        ..EditorsState::default()
+    };
+    editors.edit_page(0);
+    editors
+}
+
+#[test]
+fn dirty_page_asks_before_switching_or_creating() {
+    let mut editors = editors_with_two_pages();
+    editors.page_draft.as_mut().unwrap().draft.name = "Suja".to_owned();
+
+    editors.open_page(1);
+    assert!(editors.discard.is_some());
+    assert_eq!(editors.page_draft.as_ref().unwrap().draft.name, "Suja");
+
+    editors.confirm_discard();
+    assert_eq!(editors.page_draft.as_ref().unwrap().id, Some(2));
+
+    editors.page_draft.as_mut().unwrap().draft.name = "Suja".to_owned();
+    editors.request_new_page(client_page(0, "Nova").draft);
+    assert!(editors.discard.is_some());
+    editors.discard = None;
+    assert_eq!(editors.page_draft.as_ref().unwrap().id, Some(2));
+}
+
+#[test]
+fn clean_page_switches_without_asking() {
+    let mut editors = editors_with_two_pages();
+
+    editors.open_page(1);
+
+    assert!(editors.discard.is_none());
+    assert_eq!(editors.page_draft.as_ref().unwrap().id, Some(2));
+}
+
+#[test]
+fn delete_confirmation_is_cancelled_by_other_item_create_and_missing_draft() {
+    let mut editors = editors_with_two_pages();
+    editors.page_delete.request_page(1, "A");
+    editors.open_page(1);
+    assert!(editors.page_delete.message().is_none());
+
+    editors.page_delete.request_page(2, "B");
+    editors.request_new_page(client_page(0, "Nova").draft);
+    assert!(editors.page_delete.message().is_none());
+
+    editors.page_delete.request_page(2, "B");
+    editors.page_draft = None;
+    editors.sync_confirmations();
+    assert!(editors.page_delete.message().is_none());
+
+    editors.edit_set(0);
+    editors.set_delete.request_item_set("uid".to_owned(), "S");
+    editors.request_new_set(recommendation().item_set.unwrap());
+    assert!(editors.set_delete.message().is_none());
+}
+
+#[test]
+fn refresh_keeps_dirty_draft_but_save_replaces_it() {
+    let mut editors = editors_with_two_pages();
+    editors.page_draft.as_mut().unwrap().draft.name = "Suja".to_owned();
+    let pages = editors.pages.clone();
+    let sets = editors.sets.clone();
+
+    editors.replace_lists(pages.clone(), sets.clone(), false, false);
+    assert_eq!(editors.page_draft.as_ref().unwrap().draft.name, "Suja");
+
+    editors.replace_lists(pages, sets, true, false);
+    assert_eq!(editors.page_draft.as_ref().unwrap().draft.name, "A");
+}

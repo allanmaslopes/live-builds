@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use live_builds::catalog::ItemCatalog;
 use live_builds::lcu::item_sets::{
-    ItemBlock, ItemSet, delete_user_set, from_build, save_user_set, upsert_app_set,
+    ItemBlock, ItemSet, create_user_set, delete_user_set, from_build, save_user_set, upsert_app_set,
 };
 use live_builds::lcu::{LcuError, LcuHttp};
 use live_builds::riot_build::{ItemStage, RecommendedBuild};
@@ -348,4 +348,45 @@ fn delete_user_set_preserves_other_sets() {
     assert_eq!(sent["accountId"], 1);
     assert_eq!(sent["timestamp"], 99);
     assert_eq!(sent["itemSets"], json!([first, last]));
+}
+
+#[test]
+fn create_user_set_never_overwrites_existing_uid() {
+    let existing =
+        json!({"uid":"custom-1", "title":"Dono", "associatedChampions": [], "blocks": []});
+    let fake = FakeLcu::with_sets(json!({"accountId": 1, "itemSets": [existing.clone()]}));
+    let set = ItemSet {
+        uid: "custom-1".to_owned(),
+        title: "Novo".to_owned(),
+        champion_ids: vec![],
+        blocks: vec![],
+    };
+
+    create_user_set(&fake, &set).unwrap();
+
+    let sent = &fake.writes.borrow()[0].2["itemSets"];
+    assert_eq!(sent.as_array().unwrap().len(), 2);
+    assert_eq!(sent[0], existing);
+    assert_eq!(sent[1]["title"], "Novo");
+    assert_ne!(sent[1]["uid"], "custom-1");
+}
+
+#[test]
+fn save_keeps_items_with_non_numeric_id() {
+    let fake = FakeLcu::with_sets(json!({
+        "accountId": 1,
+        "itemSets": [{
+            "uid": "mine", "title": "T", "associatedChampions": [],
+            "blocks": [{"type": "B", "items": [
+                {"id": "1055", "count": 1}, {"id": "abc", "count": 3}
+            ]}]
+        }]
+    }));
+    let edited = live_builds::lcu::item_sets::list_sets(&fake).unwrap()[0].clone();
+
+    save_user_set(&fake, &edited).unwrap();
+
+    let items = &fake.writes.borrow()[0].2["itemSets"][0]["blocks"][0]["items"];
+    assert_eq!(items.as_array().unwrap().len(), 2);
+    assert_eq!(items[1], json!({"id": "abc", "count": 3}));
 }

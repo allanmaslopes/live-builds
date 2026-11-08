@@ -55,7 +55,7 @@ impl PollConfig {
     }
 }
 
-fn latest_ddragon_version() -> Option<String> {
+pub(crate) fn latest_ddragon_version() -> Option<String> {
     let mut response = ureq::get("https://ddragon.leagueoflegends.com/api/versions.json")
         .config()
         .timeout_global(Some(Duration::from_secs(10)))

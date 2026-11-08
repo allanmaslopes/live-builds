@@ -1,5 +1,5 @@
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use live_builds::catalog::ItemCatalog;
 use live_builds::knowledge::{KnowledgeNames, KnowledgePackage};
@@ -20,12 +20,14 @@ const LOCKED: &str = include_str!("fixtures/lcu/champ-select-session-locked.json
 fn selecting(champion_id: u32) -> SelectState {
     SelectState {
         phase: Phase::ChampSelect,
+        session_id: "session-1".to_owned(),
         champion_id: Some(champion_id),
         locked: true,
         position: "JUNGLE".to_owned(),
         spells: (14, 11),
         map_mode: (11, "CLASSIC".to_owned()),
         auto_apply: true,
+        active_page: None,
     }
 }
 
@@ -76,22 +78,35 @@ fn auto_on_applies_once_per_lock() {
 }
 
 #[test]
-fn failed_apply_retries_then_succeeds() {
+fn transient_apply_failure_retries_after_five_seconds_then_succeeds() {
     let mut applier = Applier::default();
     let settings = Settings {
         auto_runes: true,
         ..Settings::default()
     };
     let state = selecting(234);
+    let now = Instant::now();
 
-    for succeeded in [false, false, true] {
-        assert_eq!(
-            applier.on_state(&state, &settings, false),
-            vec![Action::Runes]
-        );
-        applier.confirm(Action::Runes, succeeded);
-    }
-    assert!(applier.on_state(&state, &settings, false).is_empty());
+    assert_eq!(
+        applier.on_state_at(&state, &settings, false, now),
+        vec![Action::Runes]
+    );
+    applier.confirm_at(Action::Runes, false, now);
+    assert!(
+        applier
+            .on_state_at(&state, &settings, false, now + Duration::from_secs(4))
+            .is_empty()
+    );
+    assert_eq!(
+        applier.on_state_at(&state, &settings, false, now + Duration::from_secs(5)),
+        vec![Action::Runes]
+    );
+    applier.confirm_at(Action::Runes, true, now + Duration::from_secs(5));
+    assert!(
+        applier
+            .on_state_at(&state, &settings, false, now + Duration::from_secs(60))
+            .is_empty()
+    );
 }
 
 #[test]
@@ -112,12 +127,14 @@ fn champion_swap_reapplies_and_dodge_resets() {
     );
     let outside = SelectState {
         phase: Phase::Other("Lobby".to_owned()),
+        session_id: String::new(),
         champion_id: None,
         locked: false,
         position: String::new(),
         spells: (0, 0),
         map_mode: (0, String::new()),
         auto_apply: false,
+        active_page: None,
     };
     assert!(applier.on_state(&outside, &settings, false).is_empty());
     assert_eq!(
@@ -138,6 +155,12 @@ fn auto_apply_does_not_override_user_edit() {
     assert_eq!(
         applier.on_state(&selecting(145), &settings, false),
         vec![Action::Spells, Action::ItemSet]
+    );
+    let mut next_session = selecting(145);
+    next_session.session_id = "session-2".to_owned();
+    assert_eq!(
+        applier.on_state(&next_session, &settings, false),
+        vec![Action::Runes, Action::Spells, Action::ItemSet]
     );
 }
 
@@ -175,6 +198,7 @@ fn recommendation(page: Option<RunePageDraft>, spells: (u32, u32)) -> Recommenda
             blocks: vec![ItemBlock {
                 name: "Itens".to_owned(),
                 items: vec![3078],
+                original: None,
             }],
         }),
         source: Source::HighElo,
@@ -334,11 +358,16 @@ fn poller_only_queries_session_during_champ_select() {
     let selecting = FakeHttp::responding(vec![
         json!("ChampSelect"),
         serde_json::from_str(LOCKED).unwrap(),
+        serde_json::from_str(include_str!("fixtures/lcu/perks-currentpage.json")).unwrap(),
     ]);
     let select_poll = poll_client(&selecting).unwrap();
     assert!(matches!(select_poll.state, LcuPollState::Selecting(_)));
     assert_eq!(select_poll.next, Duration::from_secs(1));
-    assert_eq!(selecting.calls.lock().unwrap().len(), 2);
+    assert_eq!(selecting.calls.lock().unwrap().len(), 3);
+    assert_eq!(
+        selecting.calls.lock().unwrap()[2].1,
+        "/lol-perks/v1/currentpage"
+    );
 }
 
 #[test]

@@ -98,6 +98,22 @@ impl StaticSource {
         }
     }
 
+    pub fn load_exact(&self, patch: &str) -> Result<StaticData, String> {
+        let item_path = self.cache_dir.join(patch).join("item.json");
+        if let Ok(json) = fs::read_to_string(&item_path)
+            && let Ok(catalog) = ItemCatalog::from_ddragon_json(patch, &json)
+        {
+            return Ok(self.with_metadata(catalog, false));
+        }
+        let json = (self.fetch)(&format!(
+            "https://ddragon.leagueoflegends.com/cdn/{patch}/data/pt_BR/item.json"
+        ))?;
+        let catalog =
+            ItemCatalog::from_ddragon_json(patch, &json).map_err(|error| error.to_string())?;
+        write_atomic(&item_path, &json)?;
+        Ok(self.with_metadata(catalog, false))
+    }
+
     fn with_metadata(&self, catalog: ItemCatalog, stale: bool) -> StaticData {
         let patch = catalog.patch.clone();
         let _ = self.cache_champions(&patch);
@@ -537,6 +553,32 @@ mod tests {
         assert_eq!(second.catalog.name(3071), "Cutelo Negro");
         assert!(!second.stale);
         assert!(calls.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn exact_load_replaces_older_micro_patch_cache() {
+        let cache = tempfile::tempdir().unwrap();
+        let old = cache.path().join("16.22.1");
+        fs::create_dir_all(&old).unwrap();
+        fs::write(
+            old.join("item.json"),
+            include_str!("../tests/fixtures/item_sample.json"),
+        )
+        .unwrap();
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let source = fixture_source(cache.path(), "16.22.2", Arc::clone(&calls));
+
+        let loaded = source.load_exact("16.22.2").unwrap();
+
+        assert_eq!(loaded.catalog_patch, "16.22.2");
+        assert!(cache.path().join("16.22.2/item.json").is_file());
+        assert!(
+            calls
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|url| url.contains("/16.22.2/"))
+        );
     }
 
     #[test]

@@ -5,7 +5,7 @@ use serde_json::{Value, json};
 
 const CURRENT_SUMMONER: &str = "/lol-summoner/v1/current-summoner";
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ItemSet {
     pub uid: String,
     pub title: String,
@@ -13,10 +13,11 @@ pub struct ItemSet {
     pub blocks: Vec<ItemBlock>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ItemBlock {
     pub name: String,
     pub items: Vec<u32>,
+    pub original: Option<Value>,
 }
 
 pub fn from_build(
@@ -31,6 +32,7 @@ pub fn from_build(
         blocks.push(ItemBlock {
             name: "Início".to_owned(),
             items: starting.clone(),
+            original: None,
         });
     }
     let (boots_stages, item_stages): (Vec<_>, Vec<_>) = build
@@ -46,6 +48,7 @@ pub fn from_build(
             blocks.push(ItemBlock {
                 name: name.to_owned(),
                 items,
+                original: None,
             });
         }
     }
@@ -75,17 +78,46 @@ pub fn upsert_app_set(http: &dyn LcuHttp, item_set: &ItemSet) -> Result<(), LcuE
     let sets = response["itemSets"]
         .as_array_mut()
         .ok_or_else(|| LcuError::Other("resposta de item sets sem itemSets".to_owned()))?;
-    let replacement = serialize_set(item_set);
-
     if let Some(existing) = sets
         .iter_mut()
         .find(|set| set["uid"].as_str() == Some(item_set.uid.as_str()))
     {
-        *existing = replacement;
+        merge_set(existing, item_set);
     } else {
-        sets.push(replacement);
+        sets.push(serialize_set(item_set));
     }
 
+    http.send("PUT", &path, &response)?;
+    Ok(())
+}
+
+/// Salva somente o arsenal indicado e devolve todo o restante do documento sem alterações.
+pub fn save_user_set(http: &dyn LcuHttp, item_set: &ItemSet) -> Result<(), LcuError> {
+    let path = sets_path(http)?;
+    let mut response = http.get(&path)?;
+    let sets = response["itemSets"]
+        .as_array_mut()
+        .ok_or_else(|| LcuError::Other("resposta de item sets sem itemSets".to_owned()))?;
+    if let Some(existing) = sets
+        .iter_mut()
+        .find(|set| set["uid"].as_str() == Some(item_set.uid.as_str()))
+    {
+        merge_set(existing, item_set);
+    } else {
+        sets.push(serialize_set(item_set));
+    }
+    http.send("PUT", &path, &response)?;
+    Ok(())
+}
+
+/// Apaga somente o arsenal indicado e preserva o envelope e os outros sets do GET.
+pub fn delete_user_set(http: &dyn LcuHttp, uid: &str) -> Result<(), LcuError> {
+    let path = sets_path(http)?;
+    let mut response = http.get(&path)?;
+    let sets = response["itemSets"]
+        .as_array_mut()
+        .ok_or_else(|| LcuError::Other("resposta de item sets sem itemSets".to_owned()))?;
+    sets.retain(|set| set["uid"].as_str() != Some(uid));
     http.send("PUT", &path, &response)?;
     Ok(())
 }
@@ -133,7 +165,11 @@ fn parse_set(value: &Value) -> Result<ItemSet, LcuError> {
                         .or_else(|| item["id"].as_u64().and_then(|id| u32::try_from(id).ok()))
                 })
                 .collect();
-            Ok(ItemBlock { name, items })
+            Ok(ItemBlock {
+                name,
+                items,
+                original: Some(block.clone()),
+            })
         })
         .collect::<Result<Vec<_>, LcuError>>()?;
 
@@ -167,4 +203,52 @@ fn serialize_set(item_set: &ItemSet) -> Value {
         "type": "custom",
         "uid": item_set.uid,
     })
+}
+
+fn merge_set(existing: &mut Value, item_set: &ItemSet) {
+    existing["title"] = json!(item_set.title);
+    existing["associatedChampions"] = json!(item_set.champion_ids);
+    existing["blocks"] = Value::Array(
+        item_set
+            .blocks
+            .iter()
+            .map(|block| {
+                let mut value = block.original.clone().unwrap_or_else(|| {
+                    json!({
+                        "hideIfSummonerSpell": "",
+                        "showIfSummonerSpell": ""
+                    })
+                });
+                let old_items = value["items"].as_array().cloned().unwrap_or_default();
+                let mut used = vec![false; old_items.len()];
+                let items = block
+                    .items
+                    .iter()
+                    .map(|id| {
+                        old_items
+                            .iter()
+                            .enumerate()
+                            .find(|(item_index, item)| {
+                                !used[*item_index] && item_id(item) == Some(*id)
+                            })
+                            .map(|(item_index, item)| {
+                                used[item_index] = true;
+                                item.clone()
+                            })
+                            .unwrap_or_else(|| json!({"count": 1, "id": id.to_string()}))
+                    })
+                    .collect();
+                value["type"] = json!(block.name);
+                value["items"] = Value::Array(items);
+                value
+            })
+            .collect(),
+    );
+}
+
+fn item_id(item: &Value) -> Option<u32> {
+    item["id"]
+        .as_str()
+        .and_then(|id| id.parse().ok())
+        .or_else(|| item["id"].as_u64().and_then(|id| u32::try_from(id).ok()))
 }

@@ -8,6 +8,7 @@ use crate::lcu::{LcuError, LcuHttp};
 use crate::settings::Settings;
 use crate::static_data::StaticSource;
 use serde_json::{Value, json};
+use std::time::{Duration, Instant};
 
 const FLASH: u32 = 4;
 const SMITE: u32 = 11;
@@ -21,12 +22,31 @@ pub enum Phase {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SelectState {
     pub phase: Phase,
+    pub session_id: String,
     pub champion_id: Option<u32>,
     pub locked: bool,
     pub position: String,
     pub spells: (u32, u32),
     pub map_mode: (u32, String),
     pub auto_apply: bool,
+    pub active_page: Option<RunePageDraft>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SelectionKey {
+    pub session_id: String,
+    pub champion_id: u32,
+    pub position: String,
+}
+
+impl SelectState {
+    pub fn selection_key(&self) -> Option<SelectionKey> {
+        Some(SelectionKey {
+            session_id: self.session_id.clone(),
+            champion_id: self.champion_id?,
+            position: self.position.clone(),
+        })
+    }
 }
 
 pub fn parse_session(json: &Value, my_cell: i64) -> SelectState {
@@ -67,6 +87,11 @@ pub fn parse_session(json: &Value, my_cell: i64) -> SelectState {
 
     SelectState {
         phase: Phase::ChampSelect,
+        session_id: json["gameId"]
+            .as_u64()
+            .map(|id| id.to_string())
+            .or_else(|| json["id"].as_str().map(str::to_owned))
+            .unwrap_or_default(),
         champion_id,
         locked,
         position,
@@ -74,6 +99,7 @@ pub fn parse_session(json: &Value, my_cell: i64) -> SelectState {
         map_mode,
         auto_apply: json["isCustomGame"].as_bool() == Some(true)
             || matches!(queue_id, 400 | 420 | 430 | 440 | 450 | 490),
+        active_page: None,
     }
 }
 
@@ -95,7 +121,7 @@ pub enum Source {
     Riot,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Recommendation {
     pub page: Option<RunePageDraft>,
     pub spells: (u32, u32),
@@ -195,7 +221,7 @@ pub enum Action {
 
 #[derive(Default)]
 pub struct Applier {
-    key: Option<(u32, String, u32, String)>,
+    key: Option<SelectionKey>,
     action_states: [ActionState; 3],
     runes_user_edited: bool,
 }
@@ -204,6 +230,8 @@ pub struct Applier {
 struct ActionState {
     attempts: u8,
     applied: bool,
+    in_flight: bool,
+    retry_at: Option<Instant>,
 }
 
 impl Applier {
@@ -213,54 +241,76 @@ impl Applier {
         settings: &Settings,
         user_edited: bool,
     ) -> Vec<Action> {
+        self.on_state_at(state, settings, user_edited, Instant::now())
+    }
+
+    pub fn on_state_at(
+        &mut self,
+        state: &SelectState,
+        settings: &Settings,
+        user_edited: bool,
+        now: Instant,
+    ) -> Vec<Action> {
         if state.phase != Phase::ChampSelect {
             *self = Self::default();
             return Vec::new();
         }
-        self.runes_user_edited |= user_edited;
         if !state.locked {
             return Vec::new();
         }
         if !state.auto_apply {
             return Vec::new();
         }
-        let Some(champion_id) = state.champion_id else {
+        let Some(key) = state.selection_key() else {
             return Vec::new();
         };
-        let key = (
-            champion_id,
-            state.position.clone(),
-            state.map_mode.0,
-            state.map_mode.1.clone(),
-        );
         if self.key.as_ref() != Some(&key) {
+            if self
+                .key
+                .as_ref()
+                .is_some_and(|previous| previous.session_id != key.session_id)
+            {
+                self.runes_user_edited = false;
+            }
             self.key = Some(key);
             self.action_states = [ActionState::default(); 3];
         }
+        self.runes_user_edited |= user_edited;
 
         let mut actions = Vec::new();
         if settings.auto_runes && !self.runes_user_edited {
-            self.queue(Action::Runes, &mut actions);
+            self.queue(Action::Runes, now, &mut actions);
         }
         if settings.auto_spells {
-            self.queue(Action::Spells, &mut actions);
+            self.queue(Action::Spells, now, &mut actions);
         }
         if settings.auto_item_set {
-            self.queue(Action::ItemSet, &mut actions);
+            self.queue(Action::ItemSet, now, &mut actions);
         }
         actions
     }
 
     pub fn confirm(&mut self, action: Action, succeeded: bool) {
+        self.confirm_at(action, succeeded, Instant::now());
+    }
+
+    pub fn confirm_at(&mut self, action: Action, succeeded: bool, now: Instant) {
+        let state = &mut self.action_states[action.index()];
+        state.in_flight = false;
         if succeeded {
-            self.action_states[action.index()].applied = true;
+            state.applied = true;
+            state.retry_at = None;
+        } else {
+            state.retry_at = Some(now + Duration::from_secs(5));
         }
     }
 
-    fn queue(&mut self, action: Action, actions: &mut Vec<Action>) {
+    fn queue(&mut self, action: Action, now: Instant, actions: &mut Vec<Action>) {
         let state = &mut self.action_states[action.index()];
-        if !state.applied && state.attempts < 3 {
+        let due = state.retry_at.is_none_or(|retry_at| now >= retry_at);
+        if !state.applied && !state.in_flight && state.attempts < 3 && due {
             state.attempts += 1;
+            state.in_flight = true;
             actions.push(action);
         }
     }

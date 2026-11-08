@@ -32,6 +32,10 @@ pub fn list_pages(http: &dyn LcuHttp) -> Result<Vec<ClientPage>, LcuError> {
         .collect())
 }
 
+pub fn active_page(http: &dyn LcuHttp) -> Result<RunePageDraft, LcuError> {
+    parse_page(&http.get(CURRENT_PAGE)?).map(|page| page.draft)
+}
+
 fn raw_pages(http: &dyn LcuHttp) -> Result<Vec<Value>, LcuError> {
     http.get(PAGES)?
         .as_array()

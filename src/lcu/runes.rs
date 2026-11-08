@@ -11,12 +11,12 @@ pub struct RunePageDraft {
     pub perks: [u32; 9],
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct RuneRules {
     styles: HashMap<u32, StyleRule>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct StyleRule {
     id: u32,
@@ -24,7 +24,7 @@ struct StyleRule {
     slots: Vec<SlotRule>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 struct SlotRule {
     perks: Vec<u32>,
 }
@@ -90,6 +90,35 @@ impl RuneRules {
             }
         }
         Ok(())
+    }
+
+    pub fn style_ids(&self) -> Vec<u32> {
+        let mut ids: Vec<_> = self.styles.keys().copied().collect();
+        ids.sort_unstable();
+        ids
+    }
+
+    pub fn allowed_sub_styles(&self, primary_style: u32) -> Vec<u32> {
+        self.styles
+            .get(&primary_style)
+            .map_or_else(Vec::new, |style| style.allowed_sub_styles.clone())
+    }
+
+    pub fn slot_perks(&self, style: u32, slot: usize) -> Vec<u32> {
+        self.styles
+            .get(&style)
+            .and_then(|style| style.slots.get(slot))
+            .map_or_else(Vec::new, |slot| slot.perks.clone())
+    }
+
+    pub fn regular_slot_of(&self, style: u32, perk: u32) -> Option<usize> {
+        self.styles
+            .get(&style)?
+            .slots
+            .get(1..4)?
+            .iter()
+            .position(|slot| slot.perks.contains(&perk))
+            .map(|index| index + 1)
     }
 }
 

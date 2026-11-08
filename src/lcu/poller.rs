@@ -6,6 +6,7 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use crate::lcu::champ_select::{Phase, SelectState, parse_session, phase_from_json};
+use crate::lcu::perks::active_page;
 use crate::lcu::{LcuClient, LcuError, LcuHttp, find_lockfile};
 
 const SELECT_INTERVAL: Duration = Duration::from_secs(1);
@@ -33,8 +34,10 @@ pub fn poll_client(http: &dyn LcuHttp) -> Result<PollResult, LcuError> {
         let my_cell = session["localPlayerCellId"]
             .as_i64()
             .ok_or_else(|| LcuError::Other("sessão sem localPlayerCellId".to_owned()))?;
+        let mut state = parse_session(&session, my_cell);
+        state.active_page = active_page(http).ok();
         return Ok(PollResult {
-            state: LcuPollState::Selecting(parse_session(&session, my_cell)),
+            state: LcuPollState::Selecting(state),
             next: SELECT_INTERVAL,
         });
     }

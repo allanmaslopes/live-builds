@@ -6,7 +6,9 @@ pub mod poller;
 pub mod riot_build;
 pub mod settings;
 pub mod static_data;
-mod ui;
+pub mod ui;
+pub mod ui_editors;
+pub mod ui_select;
 pub mod view;
 
 use poller::PollConfig;
@@ -84,7 +86,12 @@ pub fn run() -> eframe::Result {
         Box::new(move |cc| {
             let mut cfg = PollConfig::new(config.poll, config.record.clone());
             cfg.knowledge_url = config.knowledge_url.clone();
-            Ok(Box::new(ui::App::new(cc, cache_dir(), cfg)))
+            Ok(Box::new(ui::App::new(
+                cc,
+                cache_dir(),
+                cfg,
+                config.lcu_lockfile.clone(),
+            )))
         }),
     )
 }

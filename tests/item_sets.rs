@@ -2,7 +2,9 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 use live_builds::catalog::ItemCatalog;
-use live_builds::lcu::item_sets::{ItemBlock, ItemSet, from_build, upsert_app_set};
+use live_builds::lcu::item_sets::{
+    ItemBlock, ItemSet, delete_user_set, from_build, save_user_set, upsert_app_set,
+};
 use live_builds::lcu::{LcuError, LcuHttp};
 use live_builds::riot_build::{ItemStage, RecommendedBuild};
 use serde_json::{Value, json};
@@ -80,14 +82,17 @@ fn builds_item_set_from_recommendation() {
             ItemBlock {
                 name: "Início".to_owned(),
                 items: vec![1055, 2003],
+                original: None,
             },
             ItemBlock {
                 name: "Botas".to_owned(),
                 items: vec![3006],
+                original: None,
             },
             ItemBlock {
                 name: "Itens".to_owned(),
                 items: vec![3031, 3094],
+                original: None,
             },
         ]
     );
@@ -219,11 +224,128 @@ fn boots_block_follows_catalog_not_position() {
             ItemBlock {
                 name: "Botas".to_owned(),
                 items: vec![3006],
+                original: None,
             },
             ItemBlock {
                 name: "Itens".to_owned(),
                 items: vec![3190, 1042, 3031],
+                original: None,
             },
         ]
     );
+}
+
+#[test]
+fn save_user_set_preserves_other_sets() {
+    let untouched = json!({"uid":"other", "title":"Outro", "unknown":{"keep":true}});
+    let target = json!({"uid":"mine", "title":"Antigo", "unknown":"old"});
+    let fake = FakeLcu::with_sets(json!({
+        "accountId": 1, "timestamp": 99, "itemSets": [untouched.clone(), target]
+    }));
+    let edited = ItemSet {
+        uid: "mine".to_owned(),
+        title: "Novo".to_owned(),
+        champion_ids: vec![],
+        blocks: vec![ItemBlock {
+            name: "Itens".to_owned(),
+            items: vec![3031],
+            original: None,
+        }],
+    };
+
+    save_user_set(&fake, &edited).unwrap();
+
+    let sent = &fake.writes.borrow()[0].2;
+    assert_eq!(sent["accountId"], 1);
+    assert_eq!(sent["timestamp"], 99);
+    assert_eq!(sent["itemSets"][0], untouched);
+    assert_eq!(sent["itemSets"].as_array().unwrap().len(), 2);
+    assert_eq!(sent["itemSets"][1]["uid"], "mine");
+    assert_eq!(sent["itemSets"][1]["title"], "Novo");
+}
+
+#[test]
+fn editing_set_preserves_its_own_unknown_fields() {
+    let mut original: Value =
+        serde_json::from_str(include_str!("fixtures/lcu/item-sets.json")).unwrap();
+    original["itemSets"][0]["blocks"][0]["items"][0]["count"] = json!(7);
+    original["itemSets"][0]["unknownRoot"] = json!({"keep": true});
+    original["itemSets"][0]["blocks"][0]["unknownBlock"] = json!("keep");
+    original["itemSets"][0]["blocks"][0]["items"][0]["unknownItem"] = json!(42);
+    let fake = FakeLcu::with_sets(original.clone());
+    let mut edited = live_builds::lcu::item_sets::list_sets(&fake).unwrap()[0].clone();
+    edited.title = "Evelynn editada".to_owned();
+    edited.champion_ids = vec![28, 99];
+    edited.blocks[0].name = "Começo".to_owned();
+
+    save_user_set(&fake, &edited).unwrap();
+
+    let sent = &fake.writes.borrow()[0].2["itemSets"][0];
+    assert_eq!(sent["title"], "Evelynn editada");
+    assert_eq!(sent["associatedChampions"], json!([28, 99]));
+    assert_eq!(sent["blocks"][0]["type"], "Começo");
+    assert_eq!(
+        sent["associatedMaps"],
+        original["itemSets"][0]["associatedMaps"]
+    );
+    assert_eq!(
+        sent["preferredItemSlots"],
+        original["itemSets"][0]["preferredItemSlots"]
+    );
+    assert_eq!(sent["unknownRoot"], json!({"keep": true}));
+    assert_eq!(sent["blocks"][0]["unknownBlock"], "keep");
+    assert_eq!(sent["blocks"][0]["items"][0]["count"], 7);
+    assert_eq!(sent["blocks"][0]["items"][0]["unknownItem"], 42);
+}
+
+#[test]
+fn removing_first_block_keeps_second_block_conditions() {
+    let first = json!({
+        "type": "Primeiro",
+        "items": [{"id": "1055", "count": 1}],
+        "showIfSummonerSpell": "",
+        "hideIfSummonerSpell": ""
+    });
+    let second = json!({
+        "type": "Segundo",
+        "items": [{"id": "3031", "count": 1}],
+        "showIfSummonerSpell": "SummonerFlash",
+        "hideIfSummonerSpell": "SummonerSmite"
+    });
+    let fake = FakeLcu::with_sets(json!({
+        "accountId": 1,
+        "itemSets": [{
+            "uid": "mine",
+            "title": "Meu arsenal",
+            "associatedChampions": [],
+            "blocks": [first, second]
+        }]
+    }));
+    let mut edited = live_builds::lcu::item_sets::list_sets(&fake).unwrap()[0].clone();
+    edited.blocks.remove(0);
+
+    save_user_set(&fake, &edited).unwrap();
+
+    let block = &fake.writes.borrow()[0].2["itemSets"][0]["blocks"][0];
+    assert_eq!(block["type"], "Segundo");
+    assert_eq!(block["showIfSummonerSpell"], "SummonerFlash");
+    assert_eq!(block["hideIfSummonerSpell"], "SummonerSmite");
+}
+
+#[test]
+fn delete_user_set_preserves_other_sets() {
+    let first = json!({"uid":"first", "unknown":[1,2]});
+    let target = json!({"uid":"mine", "title":"Apagar"});
+    let last = json!({"uid":"last", "custom":true});
+    let fake = FakeLcu::with_sets(json!({
+        "accountId": 1, "timestamp": 99,
+        "itemSets": [first.clone(), target, last.clone()]
+    }));
+
+    delete_user_set(&fake, "mine").unwrap();
+
+    let sent = &fake.writes.borrow()[0].2;
+    assert_eq!(sent["accountId"], 1);
+    assert_eq!(sent["timestamp"], 99);
+    assert_eq!(sent["itemSets"], json!([first, last]));
 }

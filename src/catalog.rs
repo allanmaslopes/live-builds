@@ -106,6 +106,22 @@ impl ItemCatalog {
             .map_or_else(|| format!("Item {id}"), |item| item.name.clone())
     }
 
+    pub fn search(&self, query: &str) -> Vec<(u32, String)> {
+        let query = query.trim().to_lowercase();
+        if query.is_empty() {
+            return Vec::new();
+        }
+        let mut found: Vec<_> = self
+            .items
+            .values()
+            .filter(|item| item.purchasable && item.name.to_lowercase().contains(&query))
+            .map(|item| (item.id, item.name.clone()))
+            .collect();
+        found.sort_by(|left, right| left.1.cmp(&right.1).then(left.0.cmp(&right.0)));
+        found.truncate(20);
+        found
+    }
+
     /// `owned` contém `target` ou uma evolução gratuita dele (ex.: 3172 conta como 3006).
     /// Componentes consumidos numa receita não contam: viraram outro item.
     pub fn owns(&self, target: u32, owned: &[u32]) -> bool {
@@ -298,6 +314,14 @@ mod tests {
     #[test]
     fn unknown_item_is_named_by_id() {
         assert_eq!(catalog().name(999999), "Item 999999");
+    }
+
+    #[test]
+    fn search_is_unicode_case_insensitive() {
+        assert_eq!(
+            catalog().search("LÂMINA"),
+            vec![(1055, "Lâmina de Doran".to_owned())]
+        );
     }
 
     #[test]

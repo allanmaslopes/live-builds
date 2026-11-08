@@ -2,6 +2,15 @@
     "type":  "item",
     "version":  "16.22.1",
     "data":  {
+                 "1055":  {
+                              "name":  "Lâmina de Doran",
+                              "gold":  {
+                                           "base":  450,
+                                           "purchasable":  true,
+                                           "total":  450,
+                                           "sell":  180
+                                       }
+                          },
                  "3071":  {
                               "name":  "Cutelo Negro",
                               "description":  "\u003cmainText\u003e\u003cstats\u003e\u003cattention\u003e45\u003c/attention\u003e de Dano de Ataque\u003cbr\u003e\u003cattention\u003e400\u003c/attention\u003e de Vida\u003cbr\u003e\u003cattention\u003e20\u003c/attention\u003e de Aceleração de Habilidade\u003c/stats\u003e\u003cbr\u003e\u003cbr\u003e\u003cpassive\u003eTalhar\u003c/passive\u003e\u003cbr\u003eCausar \u003cphysicalDamage\u003eDano Físico\u003c/physicalDamage\u003e a Campeões reduz a \u003cscaleArmor\u003eArmadura do alvo em 6%\u003c/scaleArmor\u003e por 6s (acumula 5x).\u003cbr\u003e\u003cbr\u003e\u003cpassive\u003eFervor\u003c/passive\u003e\u003cbr\u003eCausar \u003cphysicalDamage\u003eDano Físico\u003c/physicalDamage\u003e concede \u003cspeed\u003e0 de Velocidade de Movimento\u003c/speed\u003e por 2s.\u003c/mainText\u003e",

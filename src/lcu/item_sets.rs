@@ -274,3 +274,63 @@ fn item_id(item: &Value) -> Option<u32> {
         .and_then(|id| id.parse().ok())
         .or_else(|| item["id"].as_u64().and_then(|id| u32::try_from(id).ok()))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::riot_build::ItemStage;
+
+    #[test]
+    fn item_set_contains_full_build() {
+        let catalog = ItemCatalog::from_ddragon_json(
+            "16.22.1",
+            include_str!("../../tests/fixtures/item_thresh.json"),
+        )
+        .unwrap();
+        let build = RecommendedBuild {
+            starting: vec![],
+            stages: vec![
+                ItemStage {
+                    items: vec![6672],
+                    max_completed: None,
+                },
+                ItemStage {
+                    items: vec![1001],
+                    max_completed: None,
+                },
+                ItemStage {
+                    items: vec![3124],
+                    max_completed: None,
+                },
+                ItemStage {
+                    items: vec![3302],
+                    max_completed: None,
+                },
+                ItemStage {
+                    items: vec![3006],
+                    max_completed: None,
+                },
+                ItemStage {
+                    items: vec![3032],
+                    max_completed: None,
+                },
+                ItemStage {
+                    items: vec![3036],
+                    max_completed: None,
+                },
+            ],
+        };
+
+        let item_set = from_build("Kai'Sa", 145, "BOTTOM", &build, &catalog);
+
+        assert_eq!(
+            item_set
+                .blocks
+                .iter()
+                .find(|block| block.name == "Itens")
+                .unwrap()
+                .items,
+            vec![6672, 3124, 3302, 3032, 3036]
+        );
+    }
+}

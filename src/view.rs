@@ -1,5 +1,7 @@
 use crate::catalog::{BOOTS, ItemCatalog, MAGICAL_FOOTWEAR, MAGICAL_FOOTWEAR_RUNE};
-use crate::knowledge::{KnowledgeEntry, KnowledgeNames, KnowledgePackage, RunePage};
+use crate::knowledge::{
+    KnowledgeEntry, KnowledgeNames, KnowledgePackage, RunePage, selected_full_build_path,
+};
 use crate::live::{GameSnapshot, PlayerInfo};
 use crate::riot_build::{RecommendedBuild, SkillOrder};
 use std::collections::HashMap;
@@ -187,6 +189,7 @@ pub fn build_view_with_knowledge(
             low_sample: data.entry.low_sample
                 || page.is_some_and(|page| page.low_sample)
                 || page.is_some_and(|page| page.build_path.is_some() && page.build_path_low_sample)
+                || selected_full_build_path(data.entry, page).is_some_and(|path| path.low_sample)
                 || primary.is_some_and(|primary| primary.summoner_spells_low_sample),
             keystone: keystone.map_or_else(String::new, |id| data.names.rune(id)),
             keystone_source: if page.is_some_and(|page| data.player_keystone == Some(page.keystone))
@@ -757,7 +760,7 @@ mod tests {
     }
 
     #[test]
-    fn build_path_low_sample_shows_warning() {
+    fn full_build_path_low_sample_shows_warning() {
         let package: KnowledgePackage =
             serde_json::from_str(include_str!("../tests/fixtures/knowledge-16.22.json")).unwrap();
         let mut entry = package
@@ -769,7 +772,12 @@ mod tests {
         entry.low_sample = false;
         entry.rune_pages[0].low_sample = false;
         entry.primary.as_mut().unwrap().summoner_spells_low_sample = false;
-        entry.rune_pages[0].build_path_low_sample = true;
+        entry.rune_pages[0].build_path_low_sample = false;
+        entry.rune_pages[0]
+            .full_build_path
+            .as_mut()
+            .unwrap()
+            .low_sample = true;
         let names = KnowledgeNames::default();
         let panel = build_view_with_knowledge(
             &classic(),

@@ -27,6 +27,8 @@ pub struct KnowledgeEntry {
     pub starting: Vec<SequenceStats>,
     pub boots: Vec<SequenceStats>,
     pub build_paths: Vec<SequenceStats>,
+    #[serde(default)]
+    pub full_build_paths: Vec<FullBuildPath>,
     pub skill_orders: Vec<SequenceStats>,
     pub skill_priority: String,
     pub rune_pages: Vec<RunePage>,
@@ -37,6 +39,14 @@ pub struct KnowledgeEntry {
 #[serde(rename_all = "camelCase")]
 pub struct SequenceStats {
     pub sequence: Vec<u32>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FullBuildPath {
+    pub sequence: Vec<u32>,
+    #[serde(default)]
+    pub low_sample: bool,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -55,6 +65,8 @@ pub struct RunePage {
     pub build_path: Option<SequenceStats>,
     #[serde(default)]
     pub build_path_low_sample: bool,
+    #[serde(default)]
+    pub full_build_path: Option<FullBuildPath>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -345,6 +357,18 @@ pub fn to_recommendations(
     if let Some(path) = path {
         stages.extend(path.sequence.iter().skip(1).take(2).copied().map(stage));
     }
+    let mut completed = path.map_or(0, |path| path.sequence.len().min(3));
+    if let Some(full_path) = selected_full_build_path(entry, page) {
+        for &item in &full_path.sequence {
+            if completed == 6 {
+                break;
+            }
+            if !stages.iter().any(|stage| stage.items.contains(&item)) {
+                stages.push(stage(item));
+                completed += 1;
+            }
+        }
+    }
     let build = RecommendedBuild { starting, stages };
 
     let priority: Vec<u8> = entry
@@ -362,6 +386,14 @@ pub fn to_recommendations(
         .collect();
     let skills = (!priority.is_empty()).then_some(SkillOrder { priority, early });
     (build, skills)
+}
+
+pub fn selected_full_build_path<'a>(
+    entry: &'a KnowledgeEntry,
+    page: Option<&'a RunePage>,
+) -> Option<&'a FullBuildPath> {
+    page.and_then(|page| page.full_build_path.as_ref())
+        .or_else(|| entry.full_build_paths.first())
 }
 
 fn stage(item: u32) -> ItemStage {
@@ -626,7 +658,15 @@ mod tests {
                 .iter()
                 .map(|stage| stage.items.as_slice())
                 .collect::<Vec<_>>(),
-            vec![&[6672][..], &[1001][..], &[3124][..], &[3302][..]]
+            vec![
+                &[6672][..],
+                &[1001][..],
+                &[3124][..],
+                &[3302][..],
+                &[3006][..],
+                &[3032][..],
+                &[3036][..]
+            ]
         );
         assert!(
             build
@@ -637,5 +677,87 @@ mod tests {
         let skills = skills.unwrap();
         assert_eq!(skills.priority, vec![3, 0, 2, 1]);
         assert_eq!(skills.early, vec![0, 1, 2, 0, 0, 3, 0, 2, 0]);
+    }
+
+    #[test]
+    fn full_build_extends_stages_to_six_items() {
+        let pkg = package();
+        let entry = pkg
+            .entries
+            .iter()
+            .find(|entry| entry.champion_id == 145 && entry.position == "BOTTOM")
+            .unwrap();
+
+        let (build, _) = to_recommendations(entry, select_page(entry, None));
+
+        assert_eq!(
+            build
+                .stages
+                .iter()
+                .flat_map(|stage| stage.items.iter())
+                .copied()
+                .collect::<Vec<_>>(),
+            vec![6672, 1001, 3124, 3302, 3006, 3032, 3036]
+        );
+    }
+
+    #[test]
+    fn full_build_skips_items_already_in_path() {
+        let mut document: serde_json::Value = serde_json::from_str(PACKAGE).unwrap();
+        let entry = document["entries"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|entry| entry["championId"] == 145 && entry["position"] == "BOTTOM")
+            .unwrap();
+        entry["runePages"][0]["fullBuildPath"]["sequence"] =
+            serde_json::json!([3124, 6672, 3302, 3032, 3036, 3032]);
+        let package: KnowledgePackage = serde_json::from_value(document).unwrap();
+        let entry = package
+            .entries
+            .iter()
+            .find(|entry| entry.position == "BOTTOM")
+            .unwrap();
+
+        let (build, _) = to_recommendations(entry, select_page(entry, None));
+
+        assert_eq!(
+            build
+                .stages
+                .iter()
+                .flat_map(|stage| stage.items.iter())
+                .copied()
+                .collect::<Vec<_>>(),
+            vec![6672, 1001, 3124, 3302, 3032, 3036]
+        );
+    }
+
+    #[test]
+    fn old_package_without_full_build_still_works() {
+        let mut document: serde_json::Value = serde_json::from_str(PACKAGE).unwrap();
+        for entry in document["entries"].as_array_mut().unwrap() {
+            entry.as_object_mut().unwrap().remove("fullBuildPaths");
+            for page in entry["runePages"].as_array_mut().unwrap() {
+                page.as_object_mut().unwrap().remove("fullBuildPath");
+            }
+        }
+        let package: KnowledgePackage = serde_json::from_value(document).unwrap();
+        let entry = package
+            .entries
+            .iter()
+            .find(|entry| entry.champion_id == 145 && entry.position == "BOTTOM")
+            .unwrap();
+
+        let (build, _) = to_recommendations(entry, select_page(entry, None));
+
+        assert_eq!(
+            build
+                .stages
+                .iter()
+                .flat_map(|stage| stage.items.iter())
+                .copied()
+                .collect::<Vec<_>>(),
+            vec![6672, 1001, 3124, 3302]
+        );
     }
 }

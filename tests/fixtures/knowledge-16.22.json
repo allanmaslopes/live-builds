@@ -83,6 +83,22 @@
      "winRate": 0.3571
     }
    ],
+   "fullBuildPaths": [
+    {
+     "sequence": [
+      6672,
+      3006,
+      3124,
+      3302,
+      3032,
+      3036
+     ],
+     "games": 12,
+     "wins": 7,
+     "winRate": 0.5833,
+     "lowSample": false
+    }
+   ],
    "purchaseTree": [
     {
      "sequence": [
@@ -496,6 +512,22 @@
      "winRate": 0.3571
     }
    ],
+   "fullBuildPaths": [
+    {
+     "sequence": [
+      6672,
+      3006,
+      3124,
+      3302,
+      3032,
+      3036
+     ],
+     "games": 12,
+     "wins": 7,
+     "winRate": 0.5833,
+     "lowSample": false
+    }
+   ],
    "purchaseTree": [
     {
      "sequence": [
@@ -754,7 +786,21 @@
       "wins": 17,
       "winRate": 0.5313
      },
-     "buildPathLowSample": false
+     "buildPathLowSample": false,
+     "fullBuildPath": {
+      "sequence": [
+       6672,
+       3006,
+       3124,
+       3302,
+       3032,
+       3036
+      ],
+      "games": 12,
+      "wins": 7,
+      "winRate": 0.5833,
+      "lowSample": false
+     }
     }
    ],
    "summonerSpells": [

@@ -1,5 +1,6 @@
 mod connection;
 pub mod item_sets;
+pub mod perks;
 pub mod runes;
 
 pub use connection::{

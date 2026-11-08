@@ -1,5 +1,5 @@
 mod model;
-mod tls;
+pub(crate) mod tls;
 
 use std::fmt;
 use std::io::ErrorKind;

@@ -1,0 +1,686 @@
+{
+  "accountId": 1,
+  "itemSets": [
+    {
+      "associatedChampions": [
+        28
+      ],
+      "associatedMaps": [
+        11
+      ],
+      "blocks": [
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "1103"
+            },
+            {
+              "count": 1,
+              "id": "2003"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Starting Items"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "3020"
+            },
+            {
+              "count": 1,
+              "id": "3152"
+            },
+            {
+              "count": 1,
+              "id": "3041"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Mythic & Core Items"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "3089"
+            },
+            {
+              "count": 1,
+              "id": "3100"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Fourth Item Options"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "3089"
+            },
+            {
+              "count": 1,
+              "id": "3135"
+            },
+            {
+              "count": 1,
+              "id": "4645"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Fifth Item Options"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "3135"
+            },
+            {
+              "count": 1,
+              "id": "3102"
+            },
+            {
+              "count": 1,
+              "id": "3089"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Sixth Item Options"
+        }
+      ],
+      "map": "any",
+      "mode": "any",
+      "preferredItemSlots": [],
+      "sortrank": 0,
+      "startedFrom": "blank",
+      "title": "U.GG - Evelynn",
+      "type": "custom",
+      "uid": "set-1"
+    },
+    {
+      "associatedChampions": [
+        24
+      ],
+      "associatedMaps": [
+        11
+      ],
+      "blocks": [
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "1102"
+            },
+            {
+              "count": 1,
+              "id": "2003"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Starting Items"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "6632"
+            },
+            {
+              "count": 1,
+              "id": "3111"
+            },
+            {
+              "count": 1,
+              "id": "3153"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Mythic & Core Items"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "3161"
+            },
+            {
+              "count": 1,
+              "id": "6333"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Fourth Item Options"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "6333"
+            },
+            {
+              "count": 1,
+              "id": "3161"
+            },
+            {
+              "count": 1,
+              "id": "3110"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Fifth Item Options"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "3091"
+            },
+            {
+              "count": 1,
+              "id": "6333"
+            },
+            {
+              "count": 1,
+              "id": "3157"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Sixth Item Options"
+        }
+      ],
+      "map": "any",
+      "mode": "any",
+      "preferredItemSlots": [],
+      "sortrank": 0,
+      "startedFrom": "blank",
+      "title": "U.GG - Jax",
+      "type": "custom",
+      "uid": "set-2"
+    },
+    {
+      "associatedChampions": [
+        19
+      ],
+      "associatedMaps": [
+        11
+      ],
+      "blocks": [
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "1102"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Starting Items"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "3153"
+            },
+            {
+              "count": 1,
+              "id": "3111"
+            },
+            {
+              "count": 1,
+              "id": "6665"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Mythic & Core Items"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "3748"
+            },
+            {
+              "count": 1,
+              "id": "3075"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Fourth Item Options"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "3065"
+            },
+            {
+              "count": 1,
+              "id": "3075"
+            },
+            {
+              "count": 1,
+              "id": "3748"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Fifth Item Options"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "6333"
+            },
+            {
+              "count": 1,
+              "id": "3075"
+            },
+            {
+              "count": 1,
+              "id": "3065"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Sixth Item Options"
+        }
+      ],
+      "map": "any",
+      "mode": "any",
+      "preferredItemSlots": [],
+      "sortrank": 0,
+      "startedFrom": "blank",
+      "title": "U.GG - Warwick",
+      "type": "custom",
+      "uid": "set-3"
+    },
+    {
+      "associatedChampions": [
+        122
+      ],
+      "associatedMaps": [
+        11
+      ],
+      "blocks": [
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "1055"
+            },
+            {
+              "count": 1,
+              "id": "2003"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Starting Items"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "3047"
+            },
+            {
+              "count": 1,
+              "id": "6631"
+            },
+            {
+              "count": 1,
+              "id": "3742"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Mythic & Core Items"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "3053"
+            },
+            {
+              "count": 1,
+              "id": "6333"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Fourth Item Options"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "4401"
+            },
+            {
+              "count": 1,
+              "id": "3053"
+            },
+            {
+              "count": 1,
+              "id": "6333"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Fifth Item Options"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "3053"
+            },
+            {
+              "count": 1,
+              "id": "3026"
+            },
+            {
+              "count": 1,
+              "id": "3075"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Sixth Item Options"
+        }
+      ],
+      "map": "any",
+      "mode": "any",
+      "preferredItemSlots": [],
+      "sortrank": 0,
+      "startedFrom": "blank",
+      "title": "U.GG - Darius",
+      "type": "custom",
+      "uid": "set-4"
+    },
+    {
+      "associatedChampions": [
+        202
+      ],
+      "associatedMaps": [],
+      "blocks": [
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "1055"
+            },
+            {
+              "count": 1,
+              "id": "2003"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Starter Items - Lv 1~4 Q>W>E>Q"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "1120"
+            },
+            {
+              "count": 1,
+              "id": "2003"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Starter Items"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "3009"
+            },
+            {
+              "count": 1,
+              "id": "3047"
+            },
+            {
+              "count": 1,
+              "id": "3111"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Boots - Skill Build Q>W>E"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "6697"
+            },
+            {
+              "count": 1,
+              "id": "6676"
+            },
+            {
+              "count": 1,
+              "id": "3031"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Recommended Builds - Pick:21.56, Win:52.92"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "6676"
+            },
+            {
+              "count": 1,
+              "id": "3031"
+            },
+            {
+              "count": 1,
+              "id": "3094"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Recommended Builds - Pick:11.30, Win:52.15"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "6676"
+            },
+            {
+              "count": 1,
+              "id": "3031"
+            },
+            {
+              "count": 1,
+              "id": "3036"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Recommended Builds - Pick:7.37, Win:51.97"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "6676"
+            },
+            {
+              "count": 1,
+              "id": "3094"
+            },
+            {
+              "count": 1,
+              "id": "3031"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Recommended Builds - Pick:6.88, Win:50.81"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "6697"
+            },
+            {
+              "count": 1,
+              "id": "3046"
+            },
+            {
+              "count": 1,
+              "id": "3031"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Recommended Builds - Pick:6.61, Win:57.43"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "6676"
+            },
+            {
+              "count": 1,
+              "id": "3094"
+            },
+            {
+              "count": 1,
+              "id": "3036"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Recommended Builds - Pick:2.88, Win:47.34"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "6697"
+            },
+            {
+              "count": 1,
+              "id": "3094"
+            },
+            {
+              "count": 1,
+              "id": "3031"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Recommended Builds - Pick:2.58, Win:53.97"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "6697"
+            },
+            {
+              "count": 1,
+              "id": "6676"
+            },
+            {
+              "count": 1,
+              "id": "3036"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Recommended Builds - Pick:2.46, Win:44.44"
+        },
+        {
+          "hideIfSummonerSpell": "",
+          "items": [
+            {
+              "count": 1,
+              "id": "6697"
+            },
+            {
+              "count": 1,
+              "id": "6676"
+            },
+            {
+              "count": 1,
+              "id": "3031"
+            },
+            {
+              "count": 1,
+              "id": "3094"
+            },
+            {
+              "count": 1,
+              "id": "3036"
+            },
+            {
+              "count": 1,
+              "id": "3046"
+            },
+            {
+              "count": 1,
+              "id": "3033"
+            },
+            {
+              "count": 1,
+              "id": "1038"
+            },
+            {
+              "count": 1,
+              "id": "3095"
+            },
+            {
+              "count": 1,
+              "id": "3142"
+            }
+          ],
+          "showIfSummonerSpell": "",
+          "type": "Core Items"
+        }
+      ],
+      "map": "any",
+      "mode": "any",
+      "preferredItemSlots": [],
+      "sortrank": 1,
+      "startedFrom": "blank",
+      "title": "OP.GG Jhin",
+      "type": "custom",
+      "uid": "set-5"
+    }
+  ],
+  "timestamp": 0
+}

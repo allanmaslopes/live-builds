@@ -306,3 +306,16 @@ Comunidade e bibliotecas:
 6. Comportamento com múltiplas instâncias do cliente.
 7. Comportamento do Vanguard perante a API local.
 8. Probabilidade de bloqueio de conta por uso da API local.
+
+## 6. Confirmado pela sonda (2026-11-07, cliente real, patch 16.22)
+
+Sonda: `cargo run --example lcu_probe -- --lcu-lockfile <caminho>` (só GET). Fixtures anonimizadas em `tests/fixtures/lcu/`.
+
+- **Lockfile:** a instalação pode não estar em `C:\Riot Games`. No PC do usuário: `D:\Riot Games\League of Legends\lockfile`. O registro do Windows (`Uninstall\...\League of Legends` → `InstallLocation`) e o caminho do processo `LeagueClientUx.exe` dão a pasta; o app deve procurar por eles antes do padrão.
+- **Fase:** `GET /lol-gameflow/v1/gameflow-phase` → `"Lobby"`, `"ChampSelect"`, … (string JSON).
+- **Sessão da seleção:** `GET /lol-champ-select/v1/session` → 404 `"No active delegate"` fora da seleção. Na seleção: `localPlayerCellId`; em `myTeam[]` o jogador com esse `cellId` tem `assignedPosition` (minúsculas: `top`, `jungle`, `middle`, `bottom`, `utility`; vazio em escolha às cegas), `championId`, `championPickIntent`, `spell1Id`, `spell2Id`. Em `actions[][]`, a ação `type: "pick"` do `actorCellId` vira `completed: true` com o `championId` ao travar. `timer.phase` = `BAN_PICK` durante bans e picks. Partida personalizada: `isCustomGame: true`.
+- **Feitiços:** campos `spell1Id` e `spell2Id` (confirmados na sessão; escrita via `PATCH /lol-champ-select/v1/session/my-selection` com esses nomes — validar a escrita na Task 8).
+- **Runas:** `GET /lol-perks/v1/pages` (campos `id`, `name`, `isEditable`, `isDeletable`, `isActive`, `current`, `primaryStyleId`, `subStyleId`, `selectedPerkIds` [6 runas + 3 fragmentos], `isTemporary`, `isRecommendationOverride`, …); `GET /lol-perks/v1/currentpage` igual a uma página. `GET /lol-perks/v1/styles` traz as árvores e slots.
+- **Limite de páginas:** `/lol-perks/v1/customizationlimits` não existe (404). Usar `GET /lol-perks/v1/inventory` → `{canAddCustomPage, customPageCount, isCustomPageCreationUnlocked, ownedPageCount}`.
+- **Arsenais:** `GET /lol-item-sets/v1/item-sets/{summonerId}/sets` funciona → `{accountId, itemSets[], timestamp}`; cada set: `uid`, `title`, `associatedChampions[]`, `associatedMaps[]`, `blocks[]`, `map`, `mode`, `type` (`custom`), `sortrank`, `startedFrom`, `preferredItemSlots`. `lol-loadouts` também responde, mas não é necessário para item sets.
+- **Convivência:** o usuário tem o Blitz importando runas (página "Blitz: …" ativa) e arsenais do U.GG/OP.GG. O app não toca neles; com dois importadores automáticos ligados, um pode desfazer o outro.

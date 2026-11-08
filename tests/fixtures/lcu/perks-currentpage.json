@@ -1,0 +1,108 @@
+{
+  "autoModifiedSelections": [],
+  "current": true,
+  "id": 139083824,
+  "isActive": true,
+  "isDeletable": true,
+  "isEditable": true,
+  "isRecommendationOverride": false,
+  "isTemporary": false,
+  "isValid": true,
+  "lastModified": 0,
+  "name": "Blitz: Viego Jungle",
+  "order": 0,
+  "pageKeystone": {
+    "iconPath": "/lol-game-data/assets/v1/perk-images/Styles/Domination/HailOfBlades/HailOfBlades.png",
+    "id": 9923,
+    "name": "Hail of Blades",
+    "slotType": "kKeyStone",
+    "styleId": 8100
+  },
+  "primaryStyleIconPath": "/lol-game-data/assets/v1/perk-images/Styles/Domination/domination_icon_16.svg",
+  "primaryStyleId": 8100,
+  "primaryStyleName": "Domination",
+  "quickPlayChampionIds": [],
+  "recommendationChampionId": 0,
+  "recommendationIndex": -1,
+  "runeRecommendationId": "",
+  "secondaryStyleIconPath": "/lol-game-data/assets/v1/perk-images/Styles/Precision/precision_icon_16.svg",
+  "secondaryStyleName": "Precision",
+  "selectedPerkIds": [
+    9923,
+    8143,
+    8137,
+    8135,
+    9111,
+    9104,
+    5005,
+    5008,
+    5001
+  ],
+  "subStyleId": 8000,
+  "tooltipBgPath": "/lol-game-data/assets/v1/perk-images/Styles/Domination/p8100_s8000_k9923.jpg",
+  "uiPerks": [
+    {
+      "iconPath": "/lol-game-data/assets/v1/perk-images/Styles/Domination/HailOfBlades/HailOfBlades.png",
+      "id": 9923,
+      "name": "Hail of Blades",
+      "slotType": "kKeyStone",
+      "styleId": 8100
+    },
+    {
+      "iconPath": "/lol-game-data/assets/v1/perk-images/Styles/Domination/SuddenImpact/SuddenImpact.png",
+      "id": 8143,
+      "name": "Sudden Impact",
+      "slotType": "kMixedRegularSplashable",
+      "styleId": 8100
+    },
+    {
+      "iconPath": "/lol-game-data/assets/v1/perk-images/Styles/Domination/SixthSense/SixthSense.png",
+      "id": 8137,
+      "name": "Sixth Sense",
+      "slotType": "kMixedRegularSplashable",
+      "styleId": 8100
+    },
+    {
+      "iconPath": "/lol-game-data/assets/v1/perk-images/Styles/Domination/TreasureHunter/TreasureHunter.png",
+      "id": 8135,
+      "name": "Treasure Hunter",
+      "slotType": "kMixedRegularSplashable",
+      "styleId": 8100
+    },
+    {
+      "iconPath": "/lol-game-data/assets/v1/perk-images/Styles/Precision/Triumph.png",
+      "id": 9111,
+      "name": "Triumph",
+      "slotType": "kMixedRegularSplashable",
+      "styleId": 8000
+    },
+    {
+      "iconPath": "/lol-game-data/assets/v1/perk-images/Styles/Precision/LegendAlacrity/LegendAlacrity.png",
+      "id": 9104,
+      "name": "Legend: Alacrity",
+      "slotType": "kMixedRegularSplashable",
+      "styleId": 8000
+    },
+    {
+      "iconPath": "/lol-game-data/assets/v1/perk-images/StatMods/StatModsAttackSpeedIcon.png",
+      "id": 5005,
+      "name": "Attack Speed",
+      "slotType": "kStatMod",
+      "styleId": 8400
+    },
+    {
+      "iconPath": "/lol-game-data/assets/v1/perk-images/StatMods/StatModsAdaptiveForceIcon.png",
+      "id": 5008,
+      "name": "Adaptive Force",
+      "slotType": "kStatMod",
+      "styleId": 8400
+    },
+    {
+      "iconPath": "/lol-game-data/assets/v1/perk-images/StatMods/StatModsHealthPlusIcon.png",
+      "id": 5001,
+      "name": "Health Scaling",
+      "slotType": "kStatMod",
+      "styleId": 8400
+    }
+  ]
+}

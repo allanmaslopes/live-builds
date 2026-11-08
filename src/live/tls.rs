@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use ureq::tls::{Certificate, RootCerts, TlsConfig};
 
-pub(super) fn agent() -> Result<ureq::Agent, String> {
+pub(crate) fn agent() -> Result<ureq::Agent, String> {
     let root = Certificate::from_pem(include_bytes!("../../assets/riotgames.pem"))
         .map_err(|error| error.to_string())?;
     let tls = TlsConfig::builder()

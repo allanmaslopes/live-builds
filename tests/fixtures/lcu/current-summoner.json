@@ -1,0 +1,24 @@
+{
+  "accountId": 1,
+  "displayName": "JogadorX",
+  "gameName": "JogadorX",
+  "internalName": "JogadorX",
+  "nameChangeFlag": false,
+  "percentCompleteForNextLevel": 0,
+  "privacy": "PUBLIC",
+  "profileIconId": 0,
+  "puuid": "1",
+  "rerollPoints": {
+    "currentPoints": 0,
+    "maxRolls": 2,
+    "numberOfRolls": 0,
+    "pointsCostToRoll": 250,
+    "pointsToReroll": 250
+  },
+  "summonerId": 1,
+  "summonerLevel": 0,
+  "tagLine": "BR1",
+  "unnamed": false,
+  "xpSinceLastLevel": 0,
+  "xpUntilNextLevel": 0
+}

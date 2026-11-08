@@ -225,6 +225,7 @@ fn names() -> KnowledgeNames {
         .into_iter()
         .map(|(id, name)| (id, name.to_owned()))
         .collect(),
+        ..KnowledgeNames::default()
     }
 }
 

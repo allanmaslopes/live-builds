@@ -10,7 +10,7 @@ use crate::lcu::perks::{
     ApplyOutcome, create_page, delete_page, list_pages, update_page, upsert_app_page,
 };
 use crate::lcu::poller::{LcuPollState, LcuPoller};
-use crate::lcu::runes::RuneRules;
+use crate::lcu::runes::{RunePageDraft, RuneRules};
 use crate::lcu::{LcuClient, LcuError, LcuHttp, find_lockfile};
 use crate::live::LiveClient;
 use crate::poller::{PanelState, PollConfig, Poller};
@@ -23,7 +23,9 @@ use crate::view::{
 };
 use egui::{Color32, RichText};
 use std::cmp::Ordering;
+use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::sync::{Arc, Mutex};
@@ -154,12 +156,83 @@ pub struct App {
     next_patch_check: Instant,
     applier: Applier,
     selection_error: Option<String>,
+    select_autosave: SelectAutosave,
+    icons: IconLoader,
 }
 
 #[derive(Default)]
 struct EditorRequestTracker {
     generation: u64,
     loading: bool,
+}
+
+#[derive(Default)]
+struct SelectAutosave {
+    due_at: Option<Instant>,
+    in_flight: bool,
+    superseded: bool,
+    failures: u8,
+}
+
+impl SelectAutosave {
+    fn changed(&mut self, now: Instant, valid: bool) {
+        self.superseded |= self.in_flight;
+        self.failures = 0;
+        self.due_at = valid.then_some(now + Duration::from_millis(500));
+    }
+
+    fn is_due(&self, now: Instant) -> bool {
+        !self.in_flight && self.due_at.is_some_and(|due| now >= due)
+    }
+
+    fn start(&mut self, now: Instant) -> bool {
+        if !self.is_due(now) {
+            return false;
+        }
+        self.due_at = None;
+        self.in_flight = true;
+        self.superseded = false;
+        true
+    }
+
+    fn succeeded(&mut self) -> bool {
+        self.in_flight = false;
+        if std::mem::take(&mut self.superseded) {
+            return false;
+        }
+        self.failures = 0;
+        true
+    }
+
+    /// Retorna `true` quando as três novas tentativas também falharam.
+    fn failed(&mut self, now: Instant) -> bool {
+        self.in_flight = false;
+        if std::mem::take(&mut self.superseded) {
+            return false;
+        }
+        self.failures = self.failures.saturating_add(1);
+        let delay = match self.failures {
+            1 => Some(Duration::from_secs(2)),
+            2 => Some(Duration::from_secs(5)),
+            3 => Some(Duration::from_secs(10)),
+            _ => None,
+        };
+        if let Some(delay) = delay {
+            self.due_at = Some(now + delay);
+            false
+        } else {
+            self.due_at = None;
+            true
+        }
+    }
+
+    fn remaining(&self, now: Instant) -> Option<Duration> {
+        self.due_at.map(|due| due.saturating_duration_since(now))
+    }
+
+    fn can_save(rules: &RuneRules, draft: &crate::lcu::runes::RunePageDraft) -> bool {
+        rules.validate(draft).is_ok()
+    }
 }
 
 impl EditorRequestTracker {
@@ -196,6 +269,7 @@ struct SelectionUi {
     applied: AppliedItems,
     limit_reached: bool,
     applied_page: Option<crate::lcu::runes::RunePageDraft>,
+    edited_page: Option<crate::lcu::runes::RunePageDraft>,
     /// Índice da opção de runa que o usuário escolheu (só `choose_option` define).
     chosen: Option<usize>,
     user_edited: bool,
@@ -203,6 +277,137 @@ struct SelectionUi {
     observed_spells: (u32, u32),
     /// Page the client showed before our apply; a poll still reading it is stale, not a user edit.
     stale_page: Option<crate::lcu::runes::RunePageDraft>,
+    rules: Option<RuneRules>,
+}
+
+struct IconLoader {
+    commands: Sender<String>,
+    results: Receiver<(String, Result<crate::ui_editors::DecodedIcon, String>)>,
+    requested: HashSet<String>,
+    textures: HashMap<String, egui::TextureHandle>,
+}
+
+impl IconLoader {
+    fn spawn(ctx: egui::Context, cache_dir: PathBuf) -> Self {
+        let (command_tx, command_rx) = mpsc::channel::<String>();
+        let (result_tx, result_rx) = mpsc::channel();
+        thread::spawn(move || {
+            while let Ok(icon) = command_rx.recv() {
+                let result = load_rune_icon(&cache_dir, &icon);
+                if result_tx.send((icon, result)).is_err() {
+                    break;
+                }
+                ctx.request_repaint();
+            }
+        });
+        Self {
+            commands: command_tx,
+            results: result_rx,
+            requested: HashSet::new(),
+            textures: HashMap::new(),
+        }
+    }
+
+    fn prepare(&mut self, names: &KnowledgeNames) {
+        let paths = names
+            .style_icons
+            .values()
+            .chain(names.rune_icons.values())
+            .map(String::as_str)
+            .chain(
+                [5001, 5005, 5007, 5008, 5010, 5011, 5013]
+                    .into_iter()
+                    .filter_map(|id| names.rune_icon(id)),
+            )
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
+        for path in paths {
+            if self.requested.insert(path.clone()) && self.commands.send(path).is_err() {
+                break;
+            }
+        }
+    }
+
+    fn drain(&mut self, ctx: &egui::Context) {
+        while let Ok((path, result)) = self.results.try_recv() {
+            if let Ok(decoded) = result {
+                let image = egui::ColorImage::from_rgba_unmultiplied(decoded.size, &decoded.rgba);
+                let texture = ctx.load_texture(path.clone(), image, egui::TextureOptions::LINEAR);
+                self.textures.insert(path, texture);
+            }
+        }
+    }
+}
+
+const MAX_ICON_BYTES: usize = 512 * 1024;
+const MAX_ICON_DIMENSION: usize = 256;
+
+fn read_icon_bytes(mut reader: impl Read) -> Result<Vec<u8>, String> {
+    let mut bytes = Vec::new();
+    reader
+        .by_ref()
+        .take((MAX_ICON_BYTES + 1) as u64)
+        .read_to_end(&mut bytes)
+        .map_err(|error| error.to_string())?;
+    if bytes.len() > MAX_ICON_BYTES {
+        return Err("icon larger than 512 KB".to_owned());
+    }
+    Ok(bytes)
+}
+
+fn decode_rune_icon(bytes: &[u8]) -> Result<crate::ui_editors::DecodedIcon, String> {
+    let decoded = crate::ui_editors::decode_icon(bytes)?;
+    if decoded
+        .size
+        .iter()
+        .any(|dimension| *dimension > MAX_ICON_DIMENSION)
+    {
+        return Err("icon larger than 256x256".to_owned());
+    }
+    Ok(decoded)
+}
+
+fn load_rune_icon_with<F>(
+    cache_dir: &Path,
+    icon: &str,
+    download: F,
+) -> Result<crate::ui_editors::DecodedIcon, String>
+where
+    F: FnOnce() -> Result<Vec<u8>, String>,
+{
+    let path = crate::ui_editors::icon_cache_path(cache_dir, icon);
+    if let Ok(bytes) = fs::read(&path)
+        && let Ok(decoded) = decode_rune_icon(&bytes)
+    {
+        return Ok(decoded);
+    }
+    if path.exists() {
+        fs::remove_file(&path).map_err(|error| error.to_string())?;
+    }
+
+    let bytes = download()?;
+    let decoded = decode_rune_icon(&bytes)?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    }
+    let temporary = path.with_extension("png.tmp");
+    fs::write(&temporary, &bytes).map_err(|error| error.to_string())?;
+    fs::rename(temporary, &path).map_err(|error| error.to_string())?;
+    Ok(decoded)
+}
+
+fn load_rune_icon(cache_dir: &Path, icon: &str) -> Result<crate::ui_editors::DecodedIcon, String> {
+    load_rune_icon_with(cache_dir, icon, || {
+        let mut response = ureq::get(&format!(
+            "https://ddragon.leagueoflegends.com/cdn/img/{icon}"
+        ))
+        .config()
+        .timeout_global(Some(Duration::from_secs(10)))
+        .build()
+        .call()
+        .map_err(|error| error.to_string())?;
+        read_icon_bytes(response.body_mut().as_reader())
+    })
 }
 
 impl SelectionUi {
@@ -254,6 +459,7 @@ impl SelectionUi {
             return false;
         };
         self.recommendation = chosen;
+        self.edited_page = None;
         self.chosen = Some(index);
         self.applied.item_set = false;
         self.recalculate_differences(names);
@@ -264,6 +470,7 @@ impl SelectionUi {
     fn inherit(&mut self, old: SelectionUi) {
         self.applied = old.applied;
         self.applied_page = old.applied_page;
+        self.edited_page = old.edited_page;
         self.user_edited = old.user_edited;
         self.stale_page = old.stale_page;
         if let Some(index) = old.chosen
@@ -271,6 +478,9 @@ impl SelectionUi {
         {
             self.recommendation = chosen;
             self.chosen = Some(index);
+        }
+        if let Some(page) = self.edited_page.clone() {
+            self.recommendation.page = Some(page);
         }
     }
 
@@ -306,6 +516,10 @@ enum UiCommand {
         action: Action,
         recommendation: Recommendation,
     },
+    SaveSelectionRunes {
+        key: SelectionKey,
+        draft: RunePageDraft,
+    },
     Editor {
         generation: u64,
         action: EditorAction,
@@ -323,6 +537,11 @@ enum UiResult {
     Applied {
         key: SelectionKey,
         action: Action,
+        result: Result<Option<bool>, String>,
+        selection_changed: bool,
+    },
+    SelectionRunesSaved {
+        key: SelectionKey,
         result: Result<Option<bool>, String>,
         selection_changed: bool,
     },
@@ -413,6 +632,29 @@ impl UiWorker {
                         UiResult::Applied {
                             key,
                             action,
+                            result,
+                            selection_changed,
+                        }
+                    }
+                    UiCommand::SaveSelectionRunes { key, draft } => {
+                        let checked = connect_lcu(lockfile.as_deref())
+                            .map_err(|error| error.to_string())
+                            .and_then(|http| {
+                                if session_key(&http)?.as_ref() != Some(&key) {
+                                    return Ok((None, true));
+                                }
+                                upsert_app_page(&http, &draft)
+                                    .map(|outcome| {
+                                        (Some(outcome != ApplyOutcome::LimitReached), false)
+                                    })
+                                    .map_err(|error| error.to_string())
+                            });
+                        let (result, selection_changed) = match checked {
+                            Ok((applied, changed)) => (Ok(applied), changed),
+                            Err(error) => (Err(error), false),
+                        };
+                        UiResult::SelectionRunesSaved {
+                            key,
                             result,
                             selection_changed,
                         }
@@ -558,11 +800,13 @@ fn load_selection(
             applied: AppliedItems::default(),
             limit_reached: false,
             applied_page: None,
+            edited_page: None,
             user_edited: false,
             chosen: None,
             observed_page: active.map(|page| page.draft),
             observed_spells: state.spells,
             stale_page: None,
+            rules: Some(rules),
         },
     })
 }
@@ -758,6 +1002,7 @@ impl App {
             .unwrap_or(&cache_dir)
             .join("settings.json");
         let settings = Settings::load(&settings_path);
+        let icons = IconLoader::spawn(cc.egui_ctx.clone(), cache_dir.join("icons"));
         let ui_worker = UiWorker::spawn(
             cc.egui_ctx.clone(),
             cache_dir,
@@ -782,6 +1027,8 @@ impl App {
             next_patch_check: Instant::now(),
             applier: Applier::default(),
             selection_error: None,
+            select_autosave: SelectAutosave::default(),
+            icons,
         }
     }
 }
@@ -802,6 +1049,12 @@ impl eframe::App for App {
             self.reset_selection();
         }
         self.drain_worker();
+        self.icons.drain(ctx);
+        if (screen == Screen::Select && self.selection.is_some())
+            || (screen == Screen::Editor && self.editors.tab == crate::ui_editors::EditorTab::Runes)
+        {
+            self.icons.prepare(&self.names);
+        }
         match screen {
             Screen::Game => {
                 if let PanelState::InGame(view) = state
@@ -838,6 +1091,7 @@ impl App {
         self.patch_check_in_flight = false;
         self.applier = Applier::default();
         self.selection_error = None;
+        self.select_autosave = SelectAutosave::default();
     }
 
     fn select(&mut self, ctx: &egui::Context, lcu: &LcuPollState) {
@@ -884,6 +1138,35 @@ impl App {
             self.applier
                 .on_state_at(state, &self.settings, selection.user_edited, now)
         });
+        if self.select_autosave.is_due(now) {
+            let pending = self.selection.as_ref().and_then(|selection| {
+                selection
+                    .recommendation
+                    .page
+                    .as_ref()
+                    .filter(|draft| {
+                        selection
+                            .rules
+                            .as_ref()
+                            .is_some_and(|rules| SelectAutosave::can_save(rules, draft))
+                    })
+                    .map(|draft| (selection.key.clone(), draft.clone()))
+            });
+            if let Some((key, draft)) = pending
+                && self.select_autosave.start(now)
+                && let Err(error) = self
+                    .ui_worker
+                    .send(UiCommand::SaveSelectionRunes { key, draft })
+                && self.select_autosave.failed(now)
+            {
+                self.selection_error = Some(format!(
+                    "Não foi possível salvar as runas após 3 tentativas: {error}"
+                ));
+            }
+        }
+        if let Some(remaining) = self.select_autosave.remaining(now) {
+            ctx.request_repaint_after(remaining);
+        }
         for action in actions {
             let wanted = self
                 .selection
@@ -920,12 +1203,43 @@ impl App {
             loading: self.selection_load.is_loading(state),
             error: self.selection_error.as_deref(),
         });
-        match crate::ui_select::draw(ctx, &view) {
+        let select_action = if let Some(selection) = self.selection.as_mut() {
+            crate::ui_select::draw(
+                ctx,
+                &view,
+                selection.rules.as_ref(),
+                selection.recommendation.page.as_mut(),
+                &self.names,
+                &self.icons.textures,
+            )
+        } else {
+            crate::ui_select::draw(ctx, &view, None, None, &self.names, &self.icons.textures)
+        };
+        match select_action {
             Some(SelectAction::ApplyRunes) => self.apply_selection(Action::Runes),
             Some(SelectAction::ApplySpells) => self.apply_selection(Action::Spells),
             Some(SelectAction::ApplyItemSet) => self.apply_selection(Action::ItemSet),
             Some(SelectAction::ChooseOption(index)) => self.choose_option(index),
+            Some(SelectAction::EditRunes(draft)) => self.edit_selection_runes(draft, now),
             None => {}
+        }
+    }
+
+    fn edit_selection_runes(&mut self, draft: RunePageDraft, now: Instant) {
+        let Some(selection) = self.selection.as_mut() else {
+            return;
+        };
+        if let Some(page) = selection.recommendation.page.as_mut() {
+            *page = draft;
+            selection.edited_page = Some(page.clone());
+            selection.user_edited = true;
+            self.applier.mark_choice();
+            self.selection_error = selection
+                .rules
+                .as_ref()
+                .and_then(|rules| rules.validate(page).err());
+            self.select_autosave
+                .changed(now, self.selection_error.is_none());
         }
     }
 
@@ -957,6 +1271,21 @@ impl App {
         else {
             return;
         };
+        if action == Action::Runes
+            && self.selection.as_ref().is_some_and(|selection| {
+                let Some(rules) = selection.rules.as_ref() else {
+                    return true;
+                };
+                selection
+                    .recommendation
+                    .page
+                    .as_ref()
+                    .is_none_or(|draft| rules.validate(draft).is_err())
+            })
+        {
+            self.selection_error = Some("A página de runas é inválida".to_owned());
+            return;
+        }
         if let Err(error) = self.ui_worker.send(UiCommand::Apply {
             key,
             action,
@@ -976,6 +1305,7 @@ impl App {
             &mut self.editors,
             &mut self.settings,
             &self.names,
+            &self.icons.textures,
             self.catalog.as_ref(),
             !self.editor_requests.loading(),
         );
@@ -1080,6 +1410,48 @@ impl App {
                     }
                     self.applier.confirm(action, succeeded);
                 }
+                UiResult::SelectionRunesSaved {
+                    key,
+                    result,
+                    selection_changed,
+                } => {
+                    if self.selection.as_ref().map(|selection| &selection.key) != Some(&key) {
+                        continue;
+                    }
+                    if selection_changed {
+                        self.select_autosave.succeeded();
+                        self.selection_error = Some(SELECTION_CHANGED.to_owned());
+                        continue;
+                    }
+                    match result {
+                        Ok(Some(true)) => {
+                            if self.select_autosave.succeeded() {
+                                self.selection_error = None;
+                                if let Some(selection) = &mut self.selection {
+                                    selection.mark_applied(Action::Runes, &self.names);
+                                }
+                            }
+                        }
+                        Ok(Some(false)) => {
+                            let message = "Limite de páginas de runas atingido".to_owned();
+                            if self.select_autosave.failed(Instant::now()) {
+                                self.selection_error = Some(format!(
+                                    "Não foi possível salvar as runas após 3 tentativas: {message}"
+                                ));
+                            }
+                        }
+                        Ok(None) => {
+                            self.select_autosave.succeeded();
+                        }
+                        Err(error) => {
+                            if self.select_autosave.failed(Instant::now()) {
+                                self.selection_error = Some(format!(
+                                    "Não foi possível salvar as runas após 3 tentativas: {error}"
+                                ));
+                            }
+                        }
+                    }
+                }
                 UiResult::Editor {
                     generation,
                     result,
@@ -1177,6 +1549,100 @@ mod tests {
     use crate::settings::Settings;
     use serde_json::{Value, json};
     use std::cell::{Cell, RefCell};
+    use std::io::Cursor;
+
+    #[test]
+    fn icon_download_rejects_data_above_limit() {
+        let bytes = vec![0; 512 * 1024 + 1];
+
+        assert!(read_icon_bytes(Cursor::new(bytes)).is_err());
+    }
+
+    #[test]
+    fn invalid_cached_icon_is_recovered_from_download() {
+        const PNG: &[u8] = &[
+            137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1,
+            8, 4, 0, 0, 0, 181, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, 218, 99, 100, 248, 15,
+            0, 1, 5, 1, 1, 39, 24, 227, 102, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
+        ];
+        let cache = std::env::temp_dir().join(format!("live-builds-icon-{}", std::process::id()));
+        let path = crate::ui_editors::icon_cache_path(&cache, "invalid.png");
+        fs::create_dir_all(&cache).unwrap();
+        fs::write(&path, b"invalid").unwrap();
+
+        let decoded = load_rune_icon_with(&cache, "invalid.png", || Ok(PNG.to_vec())).unwrap();
+
+        assert_eq!(decoded.size, [1, 1]);
+        assert_eq!(fs::read(path).unwrap(), PNG);
+        fs::remove_dir_all(cache).unwrap();
+    }
+
+    #[test]
+    fn select_edit_autosaves_after_debounce() {
+        let mut save = SelectAutosave::default();
+        let start = Instant::now();
+        save.changed(start, true);
+
+        assert!(!save.is_due(start + Duration::from_millis(499)));
+        assert!(save.is_due(start + Duration::from_millis(500)));
+    }
+
+    #[test]
+    fn rapid_edits_write_once() {
+        let mut save = SelectAutosave::default();
+        let start = Instant::now();
+        save.changed(start, true);
+        save.changed(start + Duration::from_millis(300), true);
+
+        assert!(!save.is_due(start + Duration::from_millis(500)));
+        assert!(save.is_due(start + Duration::from_millis(800)));
+        assert!(save.start(start + Duration::from_millis(800)));
+        save.succeeded();
+        assert!(!save.is_due(start + Duration::from_secs(2)));
+    }
+
+    #[test]
+    fn invalid_edit_is_not_saved() {
+        let rules =
+            RuneRules::from_json(include_str!("../tests/fixtures/lcu/perks-styles.json")).unwrap();
+        let mut draft = crate::ui_editors::new_page(&rules).unwrap();
+        draft.perks[0] = 999_999;
+
+        assert!(!SelectAutosave::can_save(&rules, &draft));
+    }
+
+    #[test]
+    fn invalid_edit_does_not_keep_repainting() {
+        let mut save = SelectAutosave::default();
+        let start = Instant::now();
+        save.changed(start, true);
+        assert!(save.start(start + Duration::from_millis(500)));
+        save.changed(start + Duration::from_millis(600), false);
+        assert!(!save.failed(start + Duration::from_millis(700)));
+
+        assert_eq!(save.remaining(start + Duration::from_secs(1)), None);
+        assert!(!save.is_due(start + Duration::from_secs(1)));
+    }
+
+    #[test]
+    fn autosave_retries_after_lcu_failure() {
+        let mut save = SelectAutosave::default();
+        let start = Instant::now();
+        save.changed(start, true);
+
+        assert!(save.start(start + Duration::from_millis(500)));
+        assert!(!save.failed(start + Duration::from_millis(500)));
+        assert!(!save.start(start + Duration::from_millis(2499)));
+        assert!(save.start(start + Duration::from_millis(2500)));
+
+        assert!(!save.failed(start + Duration::from_millis(2500)));
+        assert!(save.start(start + Duration::from_millis(7500)));
+        assert!(!save.failed(start + Duration::from_millis(7500)));
+        assert!(save.start(start + Duration::from_millis(17_500)));
+
+        assert!(save.failed(start + Duration::from_millis(17_500)));
+        assert_eq!(save.remaining(start + Duration::from_secs(30)), None);
+    }
 
     struct SwapHttp {
         writes: RefCell<Vec<String>>,
@@ -1341,11 +1807,13 @@ mod tests {
             applied: AppliedItems::default(),
             limit_reached: false,
             applied_page: Some(wanted.clone()),
+            edited_page: None,
             user_edited: false,
             chosen: None,
             observed_page: Some(wanted.clone()),
             observed_spells: (4, 11),
             stale_page: None,
+            rules: None,
         };
         let mut edited = wanted;
         edited.perks[0] = 8008;
@@ -1406,11 +1874,13 @@ mod tests {
             applied: AppliedItems::default(),
             limit_reached: false,
             applied_page: None,
+            edited_page: None,
             user_edited: false,
             chosen: None,
             observed_page: Some(previous.clone()),
             observed_spells: (4, 11),
             stale_page: None,
+            rules: None,
         };
         let state = SelectState {
             phase: crate::lcu::champ_select::Phase::ChampSelect,
@@ -1511,11 +1981,13 @@ mod tests {
             applied: AppliedItems::default(),
             limit_reached: false,
             applied_page: None,
+            edited_page: None,
             user_edited: false,
             chosen: None,
             observed_page: None,
             observed_spells: (4, 11),
             stale_page: None,
+            rules: None,
         };
         let mut old = make();
         old.applied.runes = true;
@@ -1527,6 +1999,54 @@ mod tests {
 
         assert!(fresh.applied.runes && fresh.user_edited);
         assert_eq!(fresh.applied_page, Some(page));
+    }
+
+    #[test]
+    fn edited_page_survives_reload() {
+        let page = RunePageDraft {
+            name: "live-builds".to_owned(),
+            primary_style: 8000,
+            sub_style: 8100,
+            perks: [8008, 8009, 9103, 3035, 8139, 8135, 5005, 5008, 5011],
+        };
+        let make = |page: RunePageDraft| SelectionUi {
+            key: SelectionKey {
+                session_id: "10".to_owned(),
+                champion_id: 234,
+                position: "JUNGLE".to_owned(),
+            },
+            champion: "Viego".to_owned(),
+            recommendation: Recommendation {
+                page: Some(page),
+                spells: (4, 11),
+                item_set: None,
+                source: Source::Riot,
+                pages: Vec::new(),
+            },
+            source_patch: None,
+            source_games: None,
+            differences: Vec::new(),
+            applied: AppliedItems::default(),
+            limit_reached: false,
+            applied_page: None,
+            edited_page: None,
+            user_edited: false,
+            chosen: None,
+            observed_page: None,
+            observed_spells: (4, 11),
+            stale_page: None,
+            rules: None,
+        };
+        let mut old = make(page.clone());
+        old.user_edited = true;
+        old.edited_page = Some(page.clone());
+        let mut recommended = page.clone();
+        recommended.perks[0] = 8005;
+        let mut fresh = make(recommended);
+
+        fresh.inherit(old);
+
+        assert_eq!(fresh.recommendation.page, Some(page));
     }
 
     struct RecordingHttp {
@@ -1597,11 +2117,13 @@ mod tests {
             applied: AppliedItems::default(),
             limit_reached: false,
             applied_page: None,
+            edited_page: None,
             user_edited: false,
             chosen: None,
             observed_page: None,
             observed_spells: (4, 11),
             stale_page: None,
+            rules: None,
         };
 
         let names = KnowledgeNames::default();
@@ -1687,11 +2209,13 @@ mod tests {
             applied: AppliedItems::default(),
             limit_reached: false,
             applied_page: None,
+            edited_page: None,
             user_edited: true,
             chosen: None,
             observed_page: None,
             observed_spells: (4, 11),
             stale_page: None,
+            rules: None,
         };
         let names = KnowledgeNames::default();
 

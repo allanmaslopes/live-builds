@@ -4,7 +4,53 @@ use crate::lcu::item_sets::{ItemBlock, ItemSet};
 use crate::lcu::perks::ClientPage;
 use crate::lcu::runes::{RunePageDraft, RuneRules};
 use crate::settings::Settings;
+use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TreeRow {
+    Primary(usize),
+    Secondary(usize),
+    Shard(usize),
+}
+
+pub fn icon_cache_path(cache_dir: &std::path::Path, icon: &str) -> std::path::PathBuf {
+    let hash = icon
+        .as_bytes()
+        .iter()
+        .fold(0xcbf29ce484222325_u64, |hash, byte| {
+            (hash ^ u64::from(*byte)).wrapping_mul(0x100000001b3)
+        });
+    cache_dir.join(format!("{hash:016x}.png"))
+}
+
+pub fn icon_label(name: &str, _icon: Option<&egui::TextureHandle>) -> String {
+    name.to_owned()
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct DecodedIcon {
+    pub size: [usize; 2],
+    pub rgba: Vec<u8>,
+}
+
+pub fn decode_icon(png: &[u8]) -> Result<DecodedIcon, String> {
+    let image = image::load_from_memory_with_format(png, image::ImageFormat::Png)
+        .map_err(|error| error.to_string())?
+        .to_rgba8();
+    Ok(DecodedIcon {
+        size: [image.width() as usize, image.height() as usize],
+        rgba: image.into_raw(),
+    })
+}
+
+pub fn tree_row_options(rules: &RuneRules, draft: &RunePageDraft, row: TreeRow) -> Vec<u32> {
+    match row {
+        TreeRow::Primary(slot) => rules.slot_perks(draft.primary_style, slot),
+        TreeRow::Secondary(index) => rune_options(rules, draft, index + 4),
+        TreeRow::Shard(index) => rules.slot_perks(draft.primary_style, index + 4),
+    }
+}
 
 pub fn new_item_set(sets: &[ItemSet], timestamp_ms: u128) -> ItemSet {
     let base = format!("live-builds-user-{timestamp_ms}");
@@ -47,6 +93,138 @@ pub fn rune_options(rules: &RuneRules, draft: &RunePageDraft, index: usize) -> V
         }
         6..=8 => rules.slot_perks(draft.primary_style, index - 2),
         _ => Vec::new(),
+    }
+}
+
+/// Árvore compartilhada pelos dois editores de runas. As opções sempre vêm das regras da LCU.
+pub fn draw_rune_tree(
+    ui: &mut egui::Ui,
+    rules: &RuneRules,
+    draft: &mut RunePageDraft,
+    names: &KnowledgeNames,
+    icons: &HashMap<String, egui::TextureHandle>,
+) -> bool {
+    let before = draft.clone();
+    ui.label("Árvore primária");
+    ui.horizontal_wrapped(|ui| {
+        for style in rules.style_ids() {
+            let name = names.style(style);
+            if rune_icon_button(
+                ui,
+                draft.primary_style == style,
+                &name,
+                names.style_icon(style),
+                icons,
+            ) && style != draft.sub_style
+            {
+                draft.primary_style = style;
+                if !rules.allowed_sub_styles(style).contains(&draft.sub_style)
+                    && let Some(sub) = rules.allowed_sub_styles(style).first()
+                {
+                    draft.sub_style = *sub;
+                }
+            }
+        }
+    });
+    for slot in 0..4 {
+        ui.horizontal_wrapped(|ui| {
+            for perk in tree_row_options(rules, draft, TreeRow::Primary(slot)) {
+                let name = names.rune(perk);
+                if rune_icon_button(
+                    ui,
+                    draft.perks[slot] == perk,
+                    &name,
+                    names.rune_icon(perk),
+                    icons,
+                ) {
+                    draft.perks[slot] = perk;
+                }
+            }
+        });
+    }
+    ui.label("Árvore secundária");
+    ui.horizontal_wrapped(|ui| {
+        for style in rules.allowed_sub_styles(draft.primary_style) {
+            let name = names.style(style);
+            if rune_icon_button(
+                ui,
+                draft.sub_style == style,
+                &name,
+                names.style_icon(style),
+                icons,
+            ) {
+                draft.sub_style = style;
+            }
+        }
+    });
+    for index in 0..2 {
+        ui.horizontal_wrapped(|ui| {
+            for perk in tree_row_options(rules, draft, TreeRow::Secondary(index)) {
+                let name = names.rune(perk);
+                if rune_icon_button(
+                    ui,
+                    draft.perks[index + 4] == perk,
+                    &name,
+                    names.rune_icon(perk),
+                    icons,
+                ) {
+                    draft.perks[index + 4] = perk;
+                }
+            }
+        });
+    }
+    ui.label("Fragmentos");
+    for index in 0..3 {
+        ui.label(match index {
+            0 => "Fragmento 1 (ofensivo)",
+            1 => "Fragmento 2 (flexível)",
+            _ => "Fragmento 3 (defensivo)",
+        });
+        ui.horizontal_wrapped(|ui| {
+            for perk in tree_row_options(rules, draft, TreeRow::Shard(index)) {
+                let name = names.rune(perk);
+                if rune_icon_button(
+                    ui,
+                    draft.perks[index + 6] == perk,
+                    &name,
+                    names.rune_icon(perk),
+                    icons,
+                ) {
+                    draft.perks[index + 6] = perk;
+                }
+            }
+        });
+    }
+    *draft != before
+}
+
+fn rune_icon_button(
+    ui: &mut egui::Ui,
+    selected: bool,
+    name: &str,
+    icon_path: Option<&str>,
+    icons: &HashMap<String, egui::TextureHandle>,
+) -> bool {
+    if let Some(texture) = icon_path.and_then(|path| icons.get(path)) {
+        let tint = if selected {
+            egui::Color32::WHITE
+        } else {
+            egui::Color32::from_gray(105)
+        };
+        ui.add(
+            egui::Button::image(
+                egui::Image::new(texture)
+                    .fit_to_exact_size(egui::vec2(36.0, 36.0))
+                    .tint(tint),
+            )
+            .selected(selected),
+        )
+        .on_hover_text(name)
+        .clicked()
+    } else {
+        ui.selectable_label(selected, icon_label(name, None))
+            .on_hover_text(name)
+            .clicked()
     }
 }
 
@@ -336,6 +514,7 @@ pub fn draw(
     state: &mut EditorsState,
     settings: &mut Settings,
     names: &KnowledgeNames,
+    icons: &HashMap<String, egui::TextureHandle>,
     catalog: Option<&ItemCatalog>,
     enabled: bool,
 ) -> Vec<EditorAction> {
@@ -370,7 +549,7 @@ pub fn draw(
         }
         state.sync_confirmations();
         ui.add_enabled_ui(enabled, |ui| match state.tab {
-            EditorTab::Runes => draw_runes(ui, state, names, &mut actions),
+            EditorTab::Runes => draw_runes(ui, state, names, icons, &mut actions),
             EditorTab::ItemSets => draw_sets(ui, state, catalog, &mut actions),
             EditorTab::Settings => {
                 ui.heading("Configurações");
@@ -406,6 +585,7 @@ fn draw_runes(
     ui: &mut egui::Ui,
     state: &mut EditorsState,
     names: &KnowledgeNames,
+    icons: &HashMap<String, egui::TextureHandle>,
     actions: &mut Vec<EditorAction>,
 ) {
     let Some(rules) = state.rules.clone() else {
@@ -442,37 +622,7 @@ fn draw_runes(
         let page_name = page.draft.name.clone();
         columns[1].add_enabled_ui(page.editable, |ui| {
             ui.text_edit_singleline(&mut page.draft.name);
-            combo(
-                ui,
-                "Árvore primária",
-                &mut page.draft.primary_style,
-                rules.style_ids(),
-                |id| names.style(id),
-            );
-            combo(
-                ui,
-                "Árvore secundária",
-                &mut page.draft.sub_style,
-                rules.allowed_sub_styles(page.draft.primary_style),
-                |id| names.style(id),
-            );
-            for rune_index in 0..9 {
-                let label = match rune_index {
-                    0..=5 => format!("Runa {}", rune_index + 1),
-                    6 => "Fragmento 1 (ofensivo)".to_owned(),
-                    7 => "Fragmento 2 (flexível)".to_owned(),
-                    8 => "Fragmento 3 (defensivo)".to_owned(),
-                    _ => unreachable!(),
-                };
-                let options = rune_options(&rules, &page.draft, rune_index);
-                combo(
-                    ui,
-                    &label,
-                    &mut page.draft.perks[rune_index],
-                    options,
-                    |id| names.rune(id),
-                );
-            }
+            draw_rune_tree(ui, &rules, &mut page.draft, names, icons);
             if ui
                 .add_enabled(
                     rules.validate(&page.draft).is_ok(),
@@ -615,30 +765,63 @@ fn draw_sets(
     });
 }
 
-fn combo(
-    ui: &mut egui::Ui,
-    label: &str,
-    selected: &mut u32,
-    options: Vec<u32>,
-    name: impl Fn(u32) -> String,
-) -> bool {
-    let before = *selected;
-    egui::ComboBox::from_label(label)
-        .selected_text(name(*selected))
-        .show_ui(ui, |ui| {
-            for option in options {
-                ui.selectable_value(selected, option, name(option));
-            }
-        });
-    *selected != before
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::knowledge::KnowledgePackage;
     use crate::lcu::runes::from_knowledge;
     use std::collections::HashMap;
+
+    #[test]
+    fn icon_cache_path_never_uses_remote_path_parts() {
+        let cache = std::path::Path::new("cache/icons");
+        for icon in ["..\\x", "C:\\a", "../../a"] {
+            let path = icon_cache_path(cache, icon);
+            assert_eq!(path.parent(), Some(cache));
+            assert_eq!(
+                path.extension().and_then(|extension| extension.to_str()),
+                Some("png")
+            );
+            assert!(path.file_stem().is_some_and(|name| name != icon));
+        }
+    }
+
+    #[test]
+    fn missing_icon_falls_back_to_text() {
+        assert_eq!(icon_label("Ritmo Fatal", None), "Ritmo Fatal");
+    }
+
+    #[test]
+    fn decodes_embedded_png() {
+        const PNG: &[u8] = &[
+            137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1,
+            8, 4, 0, 0, 0, 181, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, 218, 99, 100, 248, 15,
+            0, 1, 5, 1, 1, 39, 24, 227, 102, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
+        ];
+
+        let decoded = decode_icon(PNG).unwrap();
+
+        assert_eq!(decoded.size, [1, 1]);
+        assert_eq!(decoded.rgba.len(), 4);
+    }
+
+    #[test]
+    fn tree_offers_only_valid_runes_per_row() {
+        let rules =
+            RuneRules::from_json(include_str!("../tests/fixtures/lcu/perks-styles.json")).unwrap();
+        let draft = new_page(&rules).unwrap();
+
+        assert_eq!(
+            tree_row_options(&rules, &draft, TreeRow::Primary(1)),
+            rules.slot_perks(draft.primary_style, 1)
+        );
+        assert!(
+            tree_row_options(&rules, &draft, TreeRow::Secondary(0))
+                .iter()
+                .all(|perk| rules.regular_slot_of(draft.sub_style, *perk)
+                    != rules.regular_slot_of(draft.sub_style, draft.perks[5]))
+        );
+    }
 
     fn painted_text(shape: &egui::epaint::Shape, text: &mut Vec<String>) {
         match shape {
@@ -689,6 +872,7 @@ mod tests {
                 &mut state,
                 &mut Settings::default(),
                 &names,
+                &HashMap::new(),
                 None,
                 true,
             );

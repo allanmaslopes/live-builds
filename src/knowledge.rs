@@ -99,6 +99,8 @@ pub struct LoadedPackage {
 pub struct KnowledgeNames {
     pub runes: HashMap<u32, String>,
     pub styles: HashMap<u32, String>,
+    pub rune_icons: HashMap<u32, String>,
+    pub style_icons: HashMap<u32, String>,
     pub summoner_spells: HashMap<u32, String>,
 }
 
@@ -118,11 +120,35 @@ impl KnowledgeNames {
             .unwrap_or_else(|| id.to_string())
     }
 
+    pub fn rune_icon(&self, id: u32) -> Option<&str> {
+        self.rune_icons
+            .get(&id)
+            .map(String::as_str)
+            .or_else(|| stat_perk_icon(id))
+    }
+
+    pub fn style_icon(&self, id: u32) -> Option<&str> {
+        self.style_icons.get(&id).map(String::as_str)
+    }
+
     pub fn summoner_spell(&self, id: u32) -> String {
         self.summoner_spells
             .get(&id)
             .cloned()
             .unwrap_or_else(|| id.to_string())
+    }
+}
+
+fn stat_perk_icon(id: u32) -> Option<&'static str> {
+    match id {
+        5001 => Some("perk-images/StatMods/StatModsHealthScalingIcon.png"),
+        5005 => Some("perk-images/StatMods/StatModsAttackSpeedIcon.png"),
+        5007 => Some("perk-images/StatMods/StatModsCDRScalingIcon.png"),
+        5008 => Some("perk-images/StatMods/StatModsAdaptiveForceIcon.png"),
+        5010 => Some("perk-images/StatMods/StatModsMovementSpeedIcon.png"),
+        5011 => Some("perk-images/StatMods/StatModsHealthPlusIcon.png"),
+        5013 => Some("perk-images/StatMods/StatModsTenacityIcon.png"),
+        _ => None,
     }
 }
 
@@ -136,6 +162,23 @@ pub fn stat_perk_name(id: u32) -> Option<&'static str> {
         5011 => Some("Vida"),
         5013 => Some("Tenacidade e Lentidão"),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod icon_tests {
+    use super::KnowledgeNames;
+
+    #[test]
+    fn shard_icon_paths_match_ddragon() {
+        assert_eq!(
+            KnowledgeNames::default().rune_icon(5008),
+            Some("perk-images/StatMods/StatModsAdaptiveForceIcon.png")
+        );
+        assert_eq!(
+            KnowledgeNames::default().rune_icon(5013),
+            Some("perk-images/StatMods/StatModsTenacityIcon.png")
+        );
     }
 }
 

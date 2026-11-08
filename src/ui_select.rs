@@ -1,6 +1,9 @@
 use crate::knowledge::KnowledgeNames;
 use crate::lcu::champ_select::{Recommendation, Source};
+use crate::lcu::runes::{RunePageDraft, RuneRules};
+use crate::ui_editors::draw_rune_tree;
 use egui::{Color32, RichText};
+use std::collections::HashMap;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct AppliedItems {
@@ -154,27 +157,58 @@ fn add_notices(mut view: SelectScreenView, input: &SelectScreenInput<'_>) -> Sel
     view
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SelectAction {
     ApplyRunes,
     ApplySpells,
     ApplyItemSet,
     ChooseOption(usize),
+    EditRunes(RunePageDraft),
 }
 
-pub fn draw(ctx: &egui::Context, view: &SelectScreenView) -> Option<SelectAction> {
+pub fn rune_apply_enabled(
+    recommended: bool,
+    rules: Option<&RuneRules>,
+    draft: Option<&RunePageDraft>,
+) -> bool {
+    recommended
+        && match (rules, draft) {
+            (Some(rules), Some(draft)) => rules.validate(draft).is_ok(),
+            _ => true,
+        }
+}
+
+pub fn draw(
+    ctx: &egui::Context,
+    view: &SelectScreenView,
+    rules: Option<&RuneRules>,
+    draft: Option<&mut RunePageDraft>,
+    names: &KnowledgeNames,
+    icons: &HashMap<String, egui::TextureHandle>,
+) -> Option<SelectAction> {
     let mut action = None;
+    let can_apply_runes = rune_apply_enabled(view.can_apply_runes, rules, draft.as_deref());
     egui::CentralPanel::default().show(ctx, |ui| {
         ui.heading(&view.champion_position);
         ui.label(RichText::new(&view.source).color(Color32::from_gray(170)));
         ui.separator();
         ui.columns(3, |columns| {
             columns[0].heading("Runas");
+            if let (Some(rules), Some(draft)) = (rules, draft) {
+                columns[0].separator();
+                columns[0].label("Editar página live-builds");
+                if draw_rune_tree(&mut columns[0], rules, draft, names, icons) {
+                    action = Some(SelectAction::EditRunes(draft.clone()));
+                }
+                if let Err(error) = rules.validate(draft) {
+                    columns[0].colored_label(Color32::LIGHT_RED, error);
+                }
+            }
             for line in &view.runes {
                 columns[0].label(line);
             }
             if columns[0]
-                .add_enabled(view.can_apply_runes, egui::Button::new("Aplicar runas"))
+                .add_enabled(can_apply_runes, egui::Button::new("Aplicar runas"))
                 .clicked()
             {
                 action = Some(SelectAction::ApplyRunes);
@@ -244,4 +278,20 @@ pub fn draw(ctx: &egui::Context, view: &SelectScreenView) -> Option<SelectAction
         }
     });
     action
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ui_editors::new_page;
+
+    #[test]
+    fn invalid_draft_disables_apply_runes() {
+        let rules =
+            RuneRules::from_json(include_str!("../tests/fixtures/lcu/perks-styles.json")).unwrap();
+        let mut draft = new_page(&rules).unwrap();
+        draft.perks[0] = 999_999;
+
+        assert!(!rune_apply_enabled(true, Some(&rules), Some(&draft)));
+    }
 }

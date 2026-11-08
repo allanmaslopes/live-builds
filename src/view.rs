@@ -586,6 +586,7 @@ mod tests {
                 (8300, "Inspiração".to_owned()),
             ]),
             summoner_spells: HashMap::from([(4, "Flash".to_owned()), (12, "Teleporte".to_owned())]),
+            ..KnowledgeNames::default()
         }
     }
 

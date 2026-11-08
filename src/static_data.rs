@@ -286,6 +286,8 @@ struct DDragonChampion {
 struct DDragonRuneStyle {
     id: u32,
     name: String,
+    #[serde(default)]
+    icon: String,
     slots: Vec<DDragonRuneSlot>,
 }
 
@@ -298,6 +300,8 @@ struct DDragonRuneSlot {
 struct DDragonRune {
     id: u32,
     name: String,
+    #[serde(default)]
+    icon: String,
 }
 
 #[derive(Deserialize)]
@@ -334,8 +338,14 @@ fn parse_runes(json: &str) -> Option<KnowledgeNames> {
     }
     let mut names = KnowledgeNames::default();
     for style in styles {
+        if !style.icon.is_empty() {
+            names.style_icons.insert(style.id, style.icon);
+        }
         names.styles.insert(style.id, style.name);
         for rune in style.slots.into_iter().flat_map(|slot| slot.runes) {
+            if !rune.icon.is_empty() {
+                names.rune_icons.insert(rune.id, rune.icon);
+            }
             names.runes.insert(rune.id, rune.name);
         }
     }
@@ -392,13 +402,30 @@ fn write_atomic(path: &Path, json: &str) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::StaticSource;
+    use super::{StaticSource, parse_runes};
     use std::fs;
     use std::path::Path;
     use std::sync::{Arc, Mutex};
 
     const VERSIONS_URL: &str = "https://ddragon.leagueoflegends.com/api/versions.json";
     const THRESH: &str = include_str!("../tests/fixtures/thresh.bin.json");
+
+    #[test]
+    fn parses_rune_icon_paths() {
+        let names = parse_runes(
+            r#"[{"id":8000,"name":"Precisão","icon":"perk-images/Styles/Precision/Precision.png","slots":[{"runes":[{"id":8008,"name":"Ritmo Fatal","icon":"perk-images/Styles/Precision/LethalTempo/LethalTempo2.png"}]}]}]"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            names.style_icon(8000),
+            Some("perk-images/Styles/Precision/Precision.png")
+        );
+        assert_eq!(
+            names.rune_icon(8008),
+            Some("perk-images/Styles/Precision/LethalTempo/LethalTempo2.png")
+        );
+    }
 
     fn fixture_source(
         cache_dir: &Path,

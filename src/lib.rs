@@ -4,6 +4,7 @@ pub mod lcu;
 pub mod live;
 pub mod poller;
 pub mod riot_build;
+pub mod settings;
 pub mod static_data;
 mod ui;
 pub mod view;

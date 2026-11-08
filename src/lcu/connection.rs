@@ -134,8 +134,7 @@ impl LcuClient {
         &self,
         response: Result<ureq::http::Response<ureq::Body>, ureq::Error>,
     ) -> Result<Value, LcuError> {
-        let mut response = response
-            .map_err(|error| LcuError::Other(format!("falha ao acessar a LCU: {error}")))?;
+        let mut response = response.map_err(map_transport_error)?;
         let status = response.status().as_u16();
         let text = response
             .body_mut()
@@ -146,6 +145,16 @@ impl LcuClient {
         }
         parse_json(&text)
             .map_err(|error| LcuError::Other(format!("JSON inválido recebido da LCU: {error}")))
+    }
+}
+
+fn map_transport_error(error: ureq::Error) -> LcuError {
+    match error {
+        ureq::Error::ConnectionFailed => LcuError::ClientClosed,
+        ureq::Error::Io(error) if error.kind() == ErrorKind::ConnectionRefused => {
+            LcuError::ClientClosed
+        }
+        error => LcuError::Other(format!("falha ao acessar a LCU: {error}")),
     }
 }
 
@@ -288,6 +297,20 @@ mod tests {
     #[test]
     fn invalid_json_is_error() {
         assert!(matches!(parse_json("not json"), Err(LcuError::Other(_))));
+    }
+
+    #[test]
+    fn refused_connection_is_client_closed() {
+        assert!(matches!(
+            map_transport_error(ureq::Error::ConnectionFailed),
+            LcuError::ClientClosed
+        ));
+        assert!(matches!(
+            map_transport_error(ureq::Error::Io(std::io::Error::from(
+                ErrorKind::ConnectionRefused
+            ))),
+            LcuError::ClientClosed
+        ));
     }
 
     #[test]

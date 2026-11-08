@@ -1,6 +1,8 @@
+pub mod champ_select;
 mod connection;
 pub mod item_sets;
 pub mod perks;
+pub mod poller;
 pub mod runes;
 
 pub use connection::{

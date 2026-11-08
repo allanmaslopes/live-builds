@@ -230,7 +230,7 @@ pub fn build_view_with_knowledge(
                 .map(|stats| {
                     [stats.offense, stats.flex, stats.defense]
                         .into_iter()
-                        .map(stat_perk_name)
+                        .map(|id| data.names.rune(id))
                         .collect()
                 })
                 .unwrap_or_default(),
@@ -242,20 +242,6 @@ pub fn build_view_with_knowledge(
         });
     }
     panel
-}
-
-// shortcut: tabela fixa, trocar se a Riot mudar os fragmentos.
-fn stat_perk_name(id: u32) -> String {
-    match id {
-        5001 => "Vida escalável".to_owned(),
-        5005 => "Vel. de ataque".to_owned(),
-        5007 => "Aceleração de habilidade".to_owned(),
-        5008 => "Força adaptativa".to_owned(),
-        5010 => "Vel. de movimento".to_owned(),
-        5011 => "Vida".to_owned(),
-        5013 => "Tenacidade e Lentidão".to_owned(),
-        _ => id.to_string(),
-    }
 }
 
 fn kda(p: &PlayerInfo) -> (u32, u32, u32) {
@@ -699,7 +685,7 @@ mod tests {
         );
         assert_eq!(
             view.stat_perks,
-            ["Vel. de ataque", "Força adaptativa", "Vida"]
+            ["Velocidade de ataque", "Força adaptativa", "Vida"]
         );
     }
 

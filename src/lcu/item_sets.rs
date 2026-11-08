@@ -83,8 +83,13 @@ pub fn upsert_app_set(http: &dyn LcuHttp, item_set: &ItemSet) -> Result<(), LcuE
         .find(|set| set["uid"].as_str() == Some(item_set.uid.as_str()))
     {
         merge_set(existing, item_set);
+        existing["sortrank"] = json!(2_000_000_000);
+        existing["priority"] = json!(true);
     } else {
-        sets.push(serialize_set(item_set));
+        let mut app_set = serialize_set(item_set);
+        app_set["sortrank"] = json!(2_000_000_000);
+        app_set["priority"] = json!(true);
+        sets.push(app_set);
     }
 
     http.send("PUT", &path, &response)?;
@@ -278,7 +283,35 @@ fn item_id(item: &Value) -> Option<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lcu::LcuHttp;
     use crate::riot_build::ItemStage;
+    use std::cell::RefCell;
+
+    struct RecordingHttp {
+        responses: RefCell<Vec<Value>>,
+        put_body: RefCell<Option<Value>>,
+    }
+
+    impl RecordingHttp {
+        fn new(responses: Vec<Value>) -> Self {
+            Self {
+                responses: RefCell::new(responses),
+                put_body: RefCell::new(None),
+            }
+        }
+    }
+
+    impl LcuHttp for RecordingHttp {
+        fn get(&self, _path: &str) -> Result<Value, LcuError> {
+            Ok(self.responses.borrow_mut().remove(0))
+        }
+
+        fn send(&self, method: &str, _path: &str, body: &Value) -> Result<Value, LcuError> {
+            assert_eq!(method, "PUT");
+            *self.put_body.borrow_mut() = Some(body.clone());
+            Ok(Value::Null)
+        }
+    }
 
     #[test]
     fn item_set_contains_full_build() {
@@ -332,5 +365,47 @@ mod tests {
                 .items,
             vec![6672, 3124, 3302, 3032, 3036]
         );
+    }
+
+    #[test]
+    fn app_set_is_sent_first_in_shop() {
+        let http = RecordingHttp::new(vec![
+            json!({"summonerId": 7}),
+            json!({
+                "itemSets": [
+                    {
+                        "uid": "live-builds-145-BOTTOM",
+                        "title": "live-builds — Kai'Sa BOTTOM",
+                        "associatedChampions": [145],
+                        "blocks": [],
+                        "sortrank": 4999,
+                        "priority": false
+                    },
+                    {
+                        "uid": "live-builds-user-1",
+                        "title": "Meu arsenal",
+                        "associatedChampions": [],
+                        "blocks": [],
+                        "sortrank": 0,
+                        "priority": false
+                    }
+                ]
+            }),
+        ]);
+        let app_set = ItemSet {
+            uid: "live-builds-145-BOTTOM".to_owned(),
+            title: "live-builds — Kai'Sa BOTTOM".to_owned(),
+            champion_ids: vec![145],
+            blocks: vec![],
+        };
+
+        upsert_app_set(&http, &app_set).unwrap();
+
+        let body = http.put_body.into_inner().unwrap();
+        let sets = body["itemSets"].as_array().unwrap();
+        assert_eq!(sets[0]["sortrank"], 2_000_000_000);
+        assert_eq!(sets[0]["priority"], true);
+        assert_eq!(sets[1]["sortrank"], 0);
+        assert_eq!(sets[1]["priority"], false);
     }
 }

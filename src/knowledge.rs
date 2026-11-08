@@ -107,6 +107,7 @@ impl KnowledgeNames {
         self.runes
             .get(&id)
             .cloned()
+            .or_else(|| stat_perk_name(id).map(str::to_owned))
             .unwrap_or_else(|| id.to_string())
     }
 
@@ -122,6 +123,19 @@ impl KnowledgeNames {
             .get(&id)
             .cloned()
             .unwrap_or_else(|| id.to_string())
+    }
+}
+
+pub fn stat_perk_name(id: u32) -> Option<&'static str> {
+    match id {
+        5001 => Some("Vida escalável"),
+        5005 => Some("Velocidade de ataque"),
+        5007 => Some("Aceleração de habilidade"),
+        5008 => Some("Força adaptativa"),
+        5010 => Some("Velocidade de movimento"),
+        5011 => Some("Vida"),
+        5013 => Some("Tenacidade e Lentidão"),
+        _ => None,
     }
 }
 

@@ -457,10 +457,12 @@ fn draw_runes(
                 |id| names.style(id),
             );
             for rune_index in 0..9 {
-                let label = if rune_index < 6 {
-                    format!("Runa {}", rune_index + 1)
-                } else {
-                    format!("Fragmento {}", rune_index - 5)
+                let label = match rune_index {
+                    0..=5 => format!("Runa {}", rune_index + 1),
+                    6 => "Fragmento 1 (ofensivo)".to_owned(),
+                    7 => "Fragmento 2 (flexível)".to_owned(),
+                    8 => "Fragmento 3 (defensivo)".to_owned(),
+                    _ => unreachable!(),
                 };
                 let options = rune_options(&rules, &page.draft, rune_index);
                 combo(
@@ -629,4 +631,79 @@ fn combo(
             }
         });
     *selected != before
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::knowledge::KnowledgePackage;
+    use crate::lcu::runes::from_knowledge;
+    use std::collections::HashMap;
+
+    fn painted_text(shape: &egui::epaint::Shape, text: &mut Vec<String>) {
+        match shape {
+            egui::epaint::Shape::Text(shape) => text.push(shape.galley.text().to_owned()),
+            egui::epaint::Shape::Vec(shapes) => {
+                for shape in shapes {
+                    painted_text(shape, text);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    #[test]
+    fn editor_shows_shard_names() {
+        let package: KnowledgePackage =
+            serde_json::from_str(include_str!("../tests/fixtures/knowledge-16.22.json")).unwrap();
+        let page = package
+            .entries
+            .iter()
+            .find(|entry| entry.champion_id == 145 && entry.position == "BOTTOM")
+            .unwrap()
+            .rune_pages
+            .first()
+            .unwrap();
+        let draft = from_knowledge(page, "Kai'Sa").unwrap();
+        let mut state = EditorsState {
+            rules: Some(
+                RuneRules::from_json(include_str!("../tests/fixtures/lcu/perks-styles.json"))
+                    .unwrap(),
+            ),
+            page_draft: Some(PageEditorDraft {
+                id: None,
+                editable: true,
+                baseline: draft.clone(),
+                draft,
+            }),
+            ..Default::default()
+        };
+        let names = KnowledgeNames {
+            runes: HashMap::from([(8008, "Ritmo Fatal".to_owned())]),
+            ..Default::default()
+        };
+        let context = egui::Context::default();
+        let output = context.run(egui::RawInput::default(), |ctx| {
+            draw(
+                ctx,
+                &mut state,
+                &mut Settings::default(),
+                &names,
+                None,
+                true,
+            );
+        });
+        let mut text = Vec::new();
+        for shape in &output.shapes {
+            painted_text(&shape.shape, &mut text);
+        }
+
+        assert!(text.iter().any(|value| value == "Fragmento 1 (ofensivo)"));
+        assert!(text.iter().any(|value| value == "Fragmento 2 (flexível)"));
+        assert!(text.iter().any(|value| value == "Fragmento 3 (defensivo)"));
+        assert!(text.iter().any(|value| value == "Velocidade de ataque"));
+        assert!(text.iter().any(|value| value == "Força adaptativa"));
+        assert!(text.iter().any(|value| value == "Vida"));
+        assert!(text.iter().any(|value| value == "Ritmo Fatal"));
+    }
 }
